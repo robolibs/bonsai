@@ -296,3 +296,29 @@ TEST_CASE("Builder warns on unused decorators") {
         CHECK_THROWS_AS(builder.build(), std::runtime_error);
     }
 }
+
+TEST_CASE("Builder parallel thresholds") {
+    SUBCASE("Parallel succeeds when success threshold met") {
+        auto tree = Builder()
+                        .parallel(2)
+                        .action([](Blackboard &) { return Status::Success; })
+                        .action([](Blackboard &) { return Status::Success; })
+                        .action([](Blackboard &) { return Status::Failure; })
+                        .end()
+                        .build();
+
+        CHECK(tree.tick() == Status::Success);
+    }
+
+    SUBCASE("Parallel fails when failure threshold met") {
+        auto tree = Builder()
+                        .parallel(2, 2)
+                        .action([](Blackboard &) { return Status::Failure; })
+                        .action([](Blackboard &) { return Status::Failure; })
+                        .action([](Blackboard &) { return Status::Running; })
+                        .end()
+                        .build();
+
+        CHECK(tree.tick() == Status::Failure);
+    }
+}

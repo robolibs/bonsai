@@ -27,6 +27,14 @@ namespace bonsai::tree {
         return *this;
     }
 
+    Builder &Builder::parallel(size_t successThreshold, std::optional<size_t> failureThreshold) {
+        auto node = std::make_shared<Parallel>(successThreshold, failureThreshold);
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        stack_.emplace_back(node);
+        return *this;
+    }
+
     Builder &Builder::decorator(Decorator::Func func) {
         decorators_.emplace_back(std::move(func));
         return *this;

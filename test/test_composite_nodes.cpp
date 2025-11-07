@@ -257,3 +257,62 @@ TEST_CASE("Parallel node robustness") {
         CHECK(parallel.tick(bb) == Status::Success);
     }
 }
+
+TEST_CASE("Parallel threshold behavior") {
+    Blackboard bb;
+
+    SUBCASE("Succeeds when threshold met and halts rest") {
+        Parallel parallel(2);
+
+        auto successNode = std::make_shared<TrackingNode>();
+        successNode->behavior = []() { return Status::Success; };
+
+        auto secondSuccess = std::make_shared<TrackingNode>();
+        secondSuccess->behavior = []() { return Status::Success; };
+
+        auto runningNode = std::make_shared<TrackingNode>();
+        runningNode->behavior = []() { return Status::Running; };
+
+        parallel.addChild(runningNode);
+        parallel.addChild(successNode);
+        parallel.addChild(secondSuccess);
+
+        CHECK(parallel.tick(bb) == Status::Success);
+        CHECK(runningNode->haltCount == 1);
+    }
+
+    SUBCASE("Fails when failure threshold met") {
+        Parallel parallel(2, 2);
+
+        auto failNode = std::make_shared<TrackingNode>();
+        failNode->behavior = []() { return Status::Failure; };
+
+        auto secondFail = std::make_shared<TrackingNode>();
+        secondFail->behavior = []() { return Status::Failure; };
+
+        auto runningNode = std::make_shared<TrackingNode>();
+        runningNode->behavior = []() { return Status::Running; };
+
+        parallel.addChild(runningNode);
+        parallel.addChild(failNode);
+        parallel.addChild(secondFail);
+
+        CHECK(parallel.tick(bb) == Status::Failure);
+        CHECK(runningNode->haltCount == 1);
+    }
+
+    SUBCASE("Fails when success threshold impossible") {
+        Parallel parallel(3);
+
+        auto successNode = std::make_shared<TrackingNode>();
+        successNode->behavior = []() { return Status::Success; };
+
+        auto failNode = std::make_shared<TrackingNode>();
+        failNode->behavior = []() { return Status::Failure; };
+
+        parallel.addChild(successNode);
+        parallel.addChild(failNode);
+
+        CHECK(parallel.tick(bb) == Status::Failure);
+    }
+}

@@ -6,6 +6,7 @@
 #include "nodes/sequence.hpp"
 #include "tree.hpp"
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -16,6 +17,7 @@ namespace bonsai::tree {
         Builder &sequence();
         Builder &selector();
         Builder &parallel(Parallel::Policy successPolicy, Parallel::Policy failurePolicy);
+        Builder &parallel(size_t successThreshold, std::optional<size_t> failureThreshold = std::nullopt);
         Builder &decorator(Decorator::Func func);
         Builder &action(Action::Func func);
         Builder &end();

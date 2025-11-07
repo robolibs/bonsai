@@ -318,12 +318,13 @@ std::cout << "Result: " << (parallel_result == Status::Success ? "SUCCESS" : "FA
 
 **Key Concepts:**
 - Parallel nodes execute all children in the same tick
-- Success policy determines when the parallel node succeeds:
-  - `RequireOne`: Succeeds when at least one child succeeds
-  - `RequireAll`: Succeeds when all children succeed
-- Failure policy determines when the parallel node fails:
-  - `RequireOne`: Fails when at least one child fails
-  - `RequireAll`: Fails when all children fail
+- You can use the classic policies:
+  - `RequireOne`: succeed/fail as soon as any child succeeds/fails
+  - `RequireAll`: succeed/fail only when every child reports that status
+- For finer control, pass thresholds with `.parallel(successThreshold, failureThreshold)`:
+  - `successThreshold` = minimum number of successes required (e.g., `.parallel(2)` succeeds once two children succeed)
+  - `failureThreshold` = optional number of failures that trigger Failure (omit to require all children to fail)
+  - Bonsai automatically halts remaining children once either threshold is met or when it becomes impossible to reach the success threshold
 - Perfect for simultaneous monitoring and actions
 
 ---
