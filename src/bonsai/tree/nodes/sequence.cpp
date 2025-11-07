@@ -5,9 +5,10 @@ namespace bonsai::tree {
     void Sequence::addChild(const NodePtr &child) { children_.emplace_back(child); }
 
     Status Sequence::tick(Blackboard &blackboard) {
-        if (halted_)
+        if (state_ == State::Halted)
             return Status::Failure;
 
+        state_ = State::Running;
         while (currentIndex_ < children_.size()) {
             Status status = children_[currentIndex_]->tick(blackboard);
             if (status == Status::Running)
@@ -23,15 +24,15 @@ namespace bonsai::tree {
     }
 
     void Sequence::reset() {
+        Node::reset();
         currentIndex_ = 0;
-        halted_ = false;
         for (auto &child : children_) {
             child->reset();
         }
     }
 
     void Sequence::halt() {
-        halted_ = true;
+        Node::halt();
         for (auto &child : children_) {
             child->halt();
         }

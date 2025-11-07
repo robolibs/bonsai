@@ -12,10 +12,12 @@ namespace bonsai::tree {
     }
 
     Status UtilitySelector::tick(Blackboard &blackboard) {
-        if (halted_)
+        if (state_ == State::Halted)
             return Status::Failure;
         if (children_.empty())
             return Status::Failure;
+
+        state_ = State::Running;
 
         // Calculate utilities for all children
         float maxUtility = -1.0f;
@@ -37,11 +39,15 @@ namespace bonsai::tree {
             currentIndex_ = bestIndex;
         }
 
-        return children_[currentIndex_].node->tick(blackboard);
+        Status result = children_[currentIndex_].node->tick(blackboard);
+        if (result != Status::Running)
+            state_ = State::Idle;
+
+        return result;
     }
 
     void UtilitySelector::reset() {
-        halted_ = false;
+        Node::reset();
         for (auto &child : children_) {
             child.node->reset();
         }
@@ -49,7 +55,7 @@ namespace bonsai::tree {
     }
 
     void UtilitySelector::halt() {
-        halted_ = true;
+        Node::halt();
         for (auto &child : children_) {
             child.node->halt();
         }
@@ -64,10 +70,12 @@ namespace bonsai::tree {
     }
 
     Status WeightedRandomSelector::tick(Blackboard &blackboard) {
-        if (halted_)
+        if (state_ == State::Halted)
             return Status::Failure;
         if (children_.empty())
             return Status::Failure;
+
+        state_ = State::Running;
 
         // Calculate total weight
         float totalWeight = 0.0f;
@@ -90,23 +98,29 @@ namespace bonsai::tree {
         for (size_t i = 0; i < children_.size(); ++i) {
             accumulator += weights[i];
             if (random <= accumulator) {
-                return children_[i].node->tick(blackboard);
+                Status result = children_[i].node->tick(blackboard);
+                if (result != Status::Running)
+                    state_ = State::Idle;
+                return result;
             }
         }
 
         // Fallback to last child
-        return children_.back().node->tick(blackboard);
+        Status result = children_.back().node->tick(blackboard);
+        if (result != Status::Running)
+            state_ = State::Idle;
+        return result;
     }
 
     void WeightedRandomSelector::reset() {
-        halted_ = false;
+        Node::reset();
         for (auto &child : children_) {
             child.node->reset();
         }
     }
 
     void WeightedRandomSelector::halt() {
-        halted_ = true;
+        Node::halt();
         for (auto &child : children_) {
             child.node->halt();
         }

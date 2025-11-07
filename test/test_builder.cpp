@@ -95,6 +95,17 @@ TEST_CASE("Builder with decorators") {
         // Success should be converted to Failure
         CHECK(tree.tick() == Status::Failure);
     }
+
+    SUBCASE("Decorator applies to composite nodes") {
+        auto tree = Builder()
+                        .inverter()
+                        .sequence()
+                        .action([](Blackboard &) { return Status::Success; })
+                        .end()
+                        .build();
+
+        CHECK(tree.tick() == Status::Failure);
+    }
 }
 
 TEST_CASE("Builder with blackboard interaction") {
@@ -269,4 +280,19 @@ TEST_CASE("Tree halt resumes execution") {
 
     CHECK(tree.tick() == Status::Running);
     CHECK(execution_count == 2);
+}
+
+TEST_CASE("Builder warns on unused decorators") {
+    SUBCASE("End with pending decorator throws") {
+        Builder builder;
+        builder.sequence();
+        builder.inverter();
+        CHECK_THROWS_AS(builder.end(), std::runtime_error);
+    }
+
+    SUBCASE("Build with pending decorator throws") {
+        Builder builder;
+        builder.inverter();
+        CHECK_THROWS_AS(builder.build(), std::runtime_error);
+    }
 }

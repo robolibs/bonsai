@@ -31,12 +31,17 @@ namespace bonsai::tree {
 
       private:
         void add(const NodePtr &node);
+        NodePtr applyPendingDecorators(NodePtr node);
+        void ensureNoPendingDecorators(const char *context) const;
+        void ensureNoPendingLeafModifiers(const char *context) const;
+
+        static constexpr int kNoPendingModifier = -2;
 
         NodePtr root_;
         std::vector<NodePtr> stack_;
         std::vector<Decorator::Func> decorators_;
-        int pendingRepeat_ = -2; // -2 means no repeat pending, -1 means infinite repeat
-        int pendingRetry_ = -2;  // -2 means no retry pending, -1 means infinite retry
+        int pendingRepeat_ = kNoPendingModifier; // -2 means no repeat pending, -1 means infinite repeat
+        int pendingRetry_ = kNoPendingModifier;  // -2 means no retry pending, -1 means infinite retry
     };
 
 } // namespace bonsai::tree

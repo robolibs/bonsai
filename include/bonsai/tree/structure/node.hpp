@@ -7,15 +7,20 @@ namespace bonsai::tree {
 
     class Node {
       public:
+        enum class State { Idle, Running, Halted };
+
         virtual ~Node() = default;
         virtual Status tick(Blackboard &blackboard) = 0;
-        virtual void reset() {}
-        virtual void halt() {}
+        virtual void reset() { state_ = State::Idle; }
+        virtual void halt() { state_ = State::Halted; }
 
-        inline bool isHalted() const { return halted_; }
+        inline bool isHalted() const { return state_ == State::Halted; }
+        inline State state() const { return state_; }
 
       protected:
-        bool halted_ = false;
+        void setState(State newState) { state_ = newState; }
+
+        State state_ = State::Idle;
     };
 
     using NodePtr = std::shared_ptr<Node>;

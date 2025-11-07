@@ -1,24 +1,28 @@
 #include "bonsai/tree/builder.hpp"
+#include <string>
 
 namespace bonsai::tree {
 
     Builder &Builder::sequence() {
         auto node = std::make_shared<Sequence>();
-        add(node);
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
         stack_.emplace_back(node);
         return *this;
     }
 
     Builder &Builder::selector() {
         auto node = std::make_shared<Selector>();
-        add(node);
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
         stack_.emplace_back(node);
         return *this;
     }
 
     Builder &Builder::parallel(Parallel::Policy successPolicy, Parallel::Policy failurePolicy) {
         auto node = std::make_shared<Parallel>(successPolicy, failurePolicy);
-        add(node);
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
         stack_.emplace_back(node);
         return *this;
     }
@@ -32,22 +36,18 @@ namespace bonsai::tree {
         NodePtr node = std::make_shared<Action>(std::move(func));
 
         // Apply pending repeat decorator
-        if (pendingRepeat_ != -2) {
+        if (pendingRepeat_ != kNoPendingModifier) {
             node = std::make_shared<RepeatDecorator>(pendingRepeat_, node);
-            pendingRepeat_ = -2; // Reset
+            pendingRepeat_ = kNoPendingModifier; // Reset
         }
 
         // Apply pending retry decorator
-        if (pendingRetry_ != -2) {
+        if (pendingRetry_ != kNoPendingModifier) {
             node = std::make_shared<RetryDecorator>(pendingRetry_, node);
-            pendingRetry_ = -2; // Reset
+            pendingRetry_ = kNoPendingModifier; // Reset
         }
 
-        // Apply other decorators in reverse order (last added first)
-        while (!decorators_.empty()) {
-            node = std::make_shared<Decorator>(decorators_.back(), node);
-            decorators_.pop_back();
-        }
+        node = applyPendingDecorators(node);
 
         add(node);
         return *this;
@@ -57,11 +57,15 @@ namespace bonsai::tree {
         if (stack_.empty()) {
             throw std::runtime_error("Cannot end(): no open composite node to close");
         }
+        ensureNoPendingDecorators("end()");
+        ensureNoPendingLeafModifiers("end()");
         stack_.pop_back();
         return *this;
     }
 
     Tree Builder::build() {
+        ensureNoPendingDecorators("build()");
+        ensureNoPendingLeafModifiers("build()");
         if (!stack_.empty()) {
             throw std::runtime_error("Cannot build tree: unbalanced builder, missing end()");
         }
@@ -106,6 +110,32 @@ namespace bonsai::tree {
             } else if (auto par = std::dynamic_pointer_cast<Parallel>(parent)) {
                 par->addChild(node);
             }
+        }
+    }
+
+    NodePtr Builder::applyPendingDecorators(NodePtr node) {
+        while (!decorators_.empty()) {
+            node = std::make_shared<Decorator>(decorators_.back(), node);
+            decorators_.pop_back();
+        }
+        return node;
+    }
+
+    void Builder::ensureNoPendingDecorators(const char *context) const {
+        if (!decorators_.empty()) {
+            throw std::runtime_error(std::string("Cannot ") + context +
+                                     ": pending decorators must wrap a node before closing");
+        }
+    }
+
+    void Builder::ensureNoPendingLeafModifiers(const char *context) const {
+        if (pendingRepeat_ != kNoPendingModifier) {
+            throw std::runtime_error(std::string("Cannot ") + context +
+                                     ": pending repeat() must wrap an action");
+        }
+        if (pendingRetry_ != kNoPendingModifier) {
+            throw std::runtime_error(std::string("Cannot ") + context +
+                                     ": pending retry() must wrap an action");
         }
     }
 

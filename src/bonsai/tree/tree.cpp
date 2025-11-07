@@ -7,8 +7,10 @@ namespace bonsai::tree {
     Status Tree::tick() {
         if (!root_)
             return Status::Failure;
-        if (root_->isHalted())
+
+        if (root_->state() == Node::State::Halted)
             root_->reset();
+
         return root_->tick(blackboard_);
     }
 
@@ -18,10 +20,8 @@ namespace bonsai::tree {
     }
 
     void Tree::halt() {
-        if (!root_)
-            return;
-        root_->halt();
-        root_->reset();
+        if (root_)
+            root_->halt();
     }
 
     Blackboard &Tree::blackboard() { return blackboard_; }

@@ -332,6 +332,8 @@ std::cout << "Result: " << (parallel_result == Status::Success ? "SUCCESS" : "FA
 
 Decorators wrap other nodes and modify their behavior. They're like filters or modifiers for node results.
 
+> **Tip:** Decorators always apply to the **next** node you declare—this can be an action or a composite such as `sequence()` or `selector()`. If you try to call `end()` or `build()` while a decorator/repeat/retry is still pending, Bonsai throws an error so you can fix the misplaced modifier immediately.
+
 ```cpp
 // Inverter - flips success/failure
 std::cout << "🔄 Inverter Demo:" << std::endl;
@@ -341,7 +343,6 @@ auto inverter_demo = Builder()
             std::cout << "Action returns FAILURE" << std::endl;
             return Status::Failure; // Will be inverted to Success
         })
-    .end()
     .build();
 
 Status inverted = inverter_demo.tick();
@@ -386,7 +387,6 @@ auto succeeder_demo = Builder()
             std::cout << "Action that fails but succeeder overrides" << std::endl;
             return Status::Failure; // Will become Success
         })
-    .end()
     .build();
 
 Status succ_result = succeeder_demo.tick();

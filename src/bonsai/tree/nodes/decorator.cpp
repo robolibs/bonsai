@@ -5,19 +5,25 @@ namespace bonsai::tree {
     Decorator::Decorator(Func func, NodePtr child) : func_(std::move(func)), child_(std::move(child)) {}
 
     Status Decorator::tick(Blackboard &blackboard) {
-        if (halted_)
+        if (state_ == State::Halted)
             return Status::Failure;
+
+        state_ = State::Running;
         Status childStatus = child_->tick(blackboard);
-        return func_(childStatus);
+        Status result = func_(childStatus);
+        if (result != Status::Running) {
+            state_ = State::Idle;
+        }
+        return result;
     }
 
     void Decorator::reset() {
-        halted_ = false;
+        Node::reset();
         child_->reset();
     }
 
     void Decorator::halt() {
-        halted_ = true;
+        Node::halt();
         child_->halt();
     }
 
@@ -26,8 +32,10 @@ namespace bonsai::tree {
         : maxTimes_(maxTimes), child_(std::move(child)), currentCount_(0) {}
 
     Status RepeatDecorator::tick(Blackboard &blackboard) {
-        if (halted_)
+        if (state_ == State::Halted)
             return Status::Failure;
+
+        state_ = State::Running;
 
         Status childStatus = child_->tick(blackboard);
 
@@ -35,15 +43,14 @@ namespace bonsai::tree {
             return Status::Running;
 
         if (childStatus == Status::Failure) {
-            currentCount_ = 0;
+            reset();
             return Status::Failure;
         }
 
         ++currentCount_;
 
         if (maxTimes_ > 0 && currentCount_ >= maxTimes_) {
-            currentCount_ = 0;
-            child_->reset();
+            reset();
             return Status::Success;
         }
 
@@ -52,13 +59,13 @@ namespace bonsai::tree {
     }
 
     void RepeatDecorator::reset() {
-        halted_ = false;
+        Node::reset();
         currentCount_ = 0;
         child_->reset();
     }
 
     void RepeatDecorator::halt() {
-        halted_ = true;
+        Node::halt();
         currentCount_ = 0;
         child_->halt();
     }
@@ -68,8 +75,10 @@ namespace bonsai::tree {
         : maxTimes_(maxTimes), child_(std::move(child)), currentAttempts_(0) {}
 
     Status RetryDecorator::tick(Blackboard &blackboard) {
-        if (halted_)
+        if (state_ == State::Halted)
             return Status::Failure;
+
+        state_ = State::Running;
 
         Status childStatus = child_->tick(blackboard);
 
@@ -77,7 +86,7 @@ namespace bonsai::tree {
             return Status::Running;
 
         if (childStatus == Status::Success) {
-            currentAttempts_ = 0;
+            reset();
             return Status::Success;
         }
 
@@ -85,7 +94,7 @@ namespace bonsai::tree {
         child_->reset();
 
         if (maxTimes_ > 0 && currentAttempts_ >= maxTimes_) {
-            currentAttempts_ = 0;
+            reset();
             return Status::Failure;
         }
 
@@ -93,13 +102,13 @@ namespace bonsai::tree {
     }
 
     void RetryDecorator::reset() {
-        halted_ = false;
+        Node::reset();
         currentAttempts_ = 0;
         child_->reset();
     }
 
     void RetryDecorator::halt() {
-        halted_ = true;
+        Node::halt();
         currentAttempts_ = 0;
         child_->halt();
     }

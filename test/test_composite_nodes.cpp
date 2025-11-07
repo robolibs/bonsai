@@ -12,14 +12,18 @@ namespace {
         int haltCount = 0;
 
         Status tick(Blackboard &) override {
-            return behavior ? behavior() : Status::Success;
+            setState(State::Running);
+            Status result = behavior ? behavior() : Status::Success;
+            if (result != Status::Running)
+                setState(State::Idle);
+            return result;
         }
 
-        void reset() override { halted_ = false; }
+        void reset() override { Node::reset(); }
 
         void halt() override {
             ++haltCount;
-            halted_ = true;
+            Node::halt();
         }
     };
 } // namespace

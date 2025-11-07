@@ -11,8 +11,10 @@ namespace bonsai::tree {
     }
 
     Status Parallel::tick(Blackboard &blackboard) {
-        if (halted_)
+        if (state_ == State::Halted)
             return Status::Failure;
+
+        state_ = State::Running;
 
         if (children_.empty())
             return Status::Success;
@@ -40,25 +42,23 @@ namespace bonsai::tree {
                                 (successPolicy_ == Policy::RequireOne && success > 0);
         if (successCondition) {
             haltRunningChildren();
-            auto result = Status::Success;
             reset();
-            return result;
+            return Status::Success;
         }
 
         bool failureCondition = (failurePolicy_ == Policy::RequireAll && failure == children_.size()) ||
                                 (failurePolicy_ == Policy::RequireOne && failure > 0);
         if (failureCondition) {
             haltRunningChildren();
-            auto result = Status::Failure;
             reset();
-            return result;
+            return Status::Failure;
         }
 
         return Status::Running;
     }
 
     void Parallel::reset() {
-        halted_ = false;
+        Node::reset();
         for (size_t i = 0; i < children_.size(); ++i) {
             childStates_[i] = Status::Idle;
             children_[i]->reset();
@@ -66,7 +66,7 @@ namespace bonsai::tree {
     }
 
     void Parallel::halt() {
-        halted_ = true;
+        Node::halt();
         haltRunningChildren();
         for (size_t i = 0; i < children_.size(); ++i) {
             children_[i]->reset();
