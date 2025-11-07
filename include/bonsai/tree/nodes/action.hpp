@@ -8,17 +8,11 @@ namespace bonsai::tree {
       public:
         using Func = std::function<Status(Blackboard &)>;
 
-        explicit Action(Func func) : func_(std::move(func)) {}
+        explicit Action(Func func);
 
-        inline Status tick(Blackboard &blackboard) override {
-            if (halted_)
-                return Status::Failure;
-            return func_(blackboard);
-        }
-
-        inline void reset() override { halted_ = false; }
-
-        inline void halt() override { halted_ = true; }
+        Status tick(Blackboard &blackboard) override;
+        void reset() override;
+        void halt() override;
 
       private:
         Func func_;

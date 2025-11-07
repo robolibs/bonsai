@@ -10,31 +10,18 @@ namespace bonsai::tree {
       public:
         using Func = std::function<Status(Status)>;
 
-        Decorator(Func func, NodePtr child) : func_(std::move(func)), child_(std::move(child)) {}
+        Decorator(Func func, NodePtr child);
 
-        inline Status tick(Blackboard &blackboard) override {
-            if (halted_)
-                return Status::Failure;
-            Status childStatus = child_->tick(blackboard);
-            return func_(childStatus);
-        }
-
-        inline void reset() override {
-            halted_ = false;
-            child_->reset();
-        }
-
-        inline void halt() override {
-            halted_ = true;
-            child_->halt();
-        }
+        Status tick(Blackboard &blackboard) override;
+        void reset() override;
+        void halt() override;
 
       private:
         Func func_;
         NodePtr child_;
     };
 
-    // Common decorator factories
+    // Common decorator factories - kept inline because they create lambdas with captured state
     namespace decorators {
         inline std::function<Status(Status)> Inverter() {
             return [](Status status) {
@@ -157,50 +144,11 @@ namespace bonsai::tree {
     // Specialized repeat decorator that can execute child multiple times per tick
     class RepeatDecorator : public Node {
       public:
-        RepeatDecorator(int maxTimes, NodePtr child)
-            : maxTimes_(maxTimes), child_(std::move(child)), currentCount_(0) {}
+        RepeatDecorator(int maxTimes, NodePtr child);
 
-        inline Status tick(Blackboard &blackboard) override {
-            if (halted_)
-                return Status::Failure;
-
-            while (maxTimes_ <= 0 || currentCount_ < maxTimes_) {
-                Status childStatus = child_->tick(blackboard);
-
-                if (childStatus == Status::Running) {
-                    return Status::Running;
-                }
-
-                if (childStatus == Status::Failure) {
-                    currentCount_ = 0; // Reset on failure
-                    return Status::Failure;
-                }
-
-                // Success - increment count and continue or finish
-                currentCount_++;
-                child_->reset(); // Reset child for next iteration
-
-                if (maxTimes_ > 0 && currentCount_ >= maxTimes_) {
-                    currentCount_ = 0; // Reset for next use
-                    return Status::Success;
-                }
-
-                // Continue repeating (infinite loop case)
-            }
-
-            return Status::Success;
-        }
-
-        inline void reset() override {
-            halted_ = false;
-            currentCount_ = 0;
-            child_->reset();
-        }
-
-        inline void halt() override {
-            halted_ = true;
-            child_->halt();
-        }
+        Status tick(Blackboard &blackboard) override;
+        void reset() override;
+        void halt() override;
 
       private:
         int maxTimes_;
@@ -211,50 +159,11 @@ namespace bonsai::tree {
     // Specialized retry decorator that retries on failure
     class RetryDecorator : public Node {
       public:
-        RetryDecorator(int maxTimes, NodePtr child)
-            : maxTimes_(maxTimes), child_(std::move(child)), currentAttempts_(0) {}
+        RetryDecorator(int maxTimes, NodePtr child);
 
-        inline Status tick(Blackboard &blackboard) override {
-            if (halted_)
-                return Status::Failure;
-
-            while (maxTimes_ <= 0 || currentAttempts_ < maxTimes_) {
-                Status childStatus = child_->tick(blackboard);
-
-                if (childStatus == Status::Running) {
-                    return Status::Running;
-                }
-
-                if (childStatus == Status::Success) {
-                    currentAttempts_ = 0; // Reset on success
-                    return Status::Success;
-                }
-
-                // Failure - increment attempts and continue or finish
-                currentAttempts_++;
-                child_->reset(); // Reset child for next attempt
-
-                if (maxTimes_ > 0 && currentAttempts_ >= maxTimes_) {
-                    currentAttempts_ = 0; // Reset for next use
-                    return Status::Failure;
-                }
-
-                // Continue retrying
-            }
-
-            return Status::Failure;
-        }
-
-        inline void reset() override {
-            halted_ = false;
-            currentAttempts_ = 0;
-            child_->reset();
-        }
-
-        inline void halt() override {
-            halted_ = true;
-            child_->halt();
-        }
+        Status tick(Blackboard &blackboard) override;
+        void reset() override;
+        void halt() override;
 
       private:
         int maxTimes_;
