@@ -16,3 +16,6 @@
 // Tree and builder
 #include "tree/builder.hpp"
 #include "tree/tree.hpp"
+
+// State machine
+#include "state/state.hpp"
