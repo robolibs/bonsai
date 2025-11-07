@@ -117,3 +117,47 @@ TEST_CASE("Blackboard thread safety") {
         }
     }
 }
+
+TEST_CASE("Blackboard scopes") {
+    Blackboard bb;
+    bb.set("shared", 1);
+
+    {
+        auto scope = bb.pushScope();
+        bb.set("shared", 2);
+        bb.set("inner_only", 99);
+
+        auto shared = bb.get<int>("shared");
+        REQUIRE(shared.has_value());
+        CHECK(shared.value() == 2);
+
+        scope.release();
+    }
+
+    auto shared_after = bb.get<int>("shared");
+    REQUIRE(shared_after.has_value());
+    CHECK(shared_after.value() == 1);
+
+    auto inner_value = bb.get<int>("inner_only");
+    CHECK_FALSE(inner_value.has_value());
+}
+
+TEST_CASE("Blackboard observer notifications") {
+    Blackboard bb;
+    std::vector<Blackboard::Event> events;
+    bb.setObserver([&events](const Blackboard::Event &event) { events.push_back(event); });
+
+    bb.set("key", 42);
+    auto value = bb.get<int>("key");
+    (void)value;
+    bb.get<int>("missing");
+    bb.remove("key");
+    bb.clear();
+
+    REQUIRE(events.size() >= 4);
+    CHECK(events[0].type == Blackboard::Event::Type::Set);
+    CHECK(events[1].type == Blackboard::Event::Type::Get);
+    CHECK(events[1].success);
+    CHECK(events[2].type == Blackboard::Event::Type::Get);
+    CHECK_FALSE(events[2].success);
+}

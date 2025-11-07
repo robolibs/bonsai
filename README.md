@@ -93,6 +93,18 @@ auto health = tree.blackboard().get<int>("health");
 if (health.has_value() && health.value() < 50) {
     // Low health logic
 }
+
+// Use scoped overrides that automatically roll back
+{
+    auto scope = tree.blackboard().pushScope();
+    tree.blackboard().set("health", 10);
+    // ...
+} // scope popped here, health returns to previous value
+
+// Observe all accesses for debugging
+tree.blackboard().setObserver([](const Blackboard::Event &evt) {
+    std::cout << "Blackboard event: " << static_cast<int>(evt.type) << " key=" << evt.key << std::endl;
+});
 ```
 
 ## Building
