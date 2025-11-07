@@ -54,13 +54,17 @@ namespace bonsai::tree {
     }
 
     Builder &Builder::end() {
-        if (!stack_.empty()) {
-            stack_.pop_back();
+        if (stack_.empty()) {
+            throw std::runtime_error("Cannot end(): no open composite node to close");
         }
+        stack_.pop_back();
         return *this;
     }
 
     Tree Builder::build() {
+        if (!stack_.empty()) {
+            throw std::runtime_error("Cannot build tree: unbalanced builder, missing end()");
+        }
         if (!root_) {
             throw std::runtime_error("Cannot build tree: no root node");
         }

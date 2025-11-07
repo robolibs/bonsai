@@ -139,7 +139,13 @@ TEST_CASE("Builder repeat decorator") {
                         })
                         .build();
 
-        CHECK(tree.tick() == Status::Success);
+        Status status = Status::Running;
+        int safety = 0;
+        while (status == Status::Running && safety++ < 10) {
+            status = tree.tick();
+        }
+
+        CHECK(status == Status::Success);
         CHECK(execution_count == 3); // Should repeat 3 times then succeed
     }
 
@@ -154,8 +160,13 @@ TEST_CASE("Builder repeat decorator") {
                         })
                         .build();
 
-        // The repeat should run until the action fails
-        CHECK(tree.tick() == Status::Failure);
+        Status status = Status::Running;
+        int iterations = 0;
+        while (status == Status::Running && iterations++ < 10) {
+            status = tree.tick();
+        }
+
+        CHECK(status == Status::Failure);
         CHECK(execution_count == 5);
     }
 
@@ -169,7 +180,13 @@ TEST_CASE("Builder repeat decorator") {
                         })
                         .build();
 
-        CHECK(tree.tick() == Status::Failure);
+        Status status = Status::Running;
+        int safety = 0;
+        while (status == Status::Running && safety++ < 10) {
+            status = tree.tick();
+        }
+
+        CHECK(status == Status::Failure);
         CHECK(execution_count == 3); // Should stop repeating when action fails
     }
 }
@@ -186,7 +203,13 @@ TEST_CASE("Builder retry decorator") {
                         })
                         .build();
 
-        CHECK(tree.tick() == Status::Failure);
+        Status status = Status::Running;
+        int safety = 0;
+        while (status == Status::Running && safety++ < 10) {
+            status = tree.tick();
+        }
+
+        CHECK(status == Status::Failure);
         CHECK(execution_count == 3); // Should retry 3 times then give up
     }
 
@@ -200,7 +223,13 @@ TEST_CASE("Builder retry decorator") {
                         })
                         .build();
 
-        CHECK(tree.tick() == Status::Success);
+        Status status = Status::Running;
+        int safety = 0;
+        while (status == Status::Running && safety++ < 10) {
+            status = tree.tick();
+        }
+
+        CHECK(status == Status::Success);
         CHECK(execution_count == 3); // Should retry until success
     }
 }
@@ -210,4 +239,34 @@ TEST_CASE("Builder error handling") {
         Builder builder;
         CHECK_THROWS_AS(builder.build(), std::runtime_error);
     }
+
+    SUBCASE("End without open composite throws") {
+        Builder builder;
+        CHECK_THROWS_AS(builder.end(), std::runtime_error);
+    }
+
+    SUBCASE("Unbalanced builder stack detected") {
+        auto builder = Builder();
+        builder.sequence().action([](Blackboard &) { return Status::Success; });
+
+        CHECK_THROWS_AS(builder.build(), std::runtime_error);
+    }
+}
+
+TEST_CASE("Tree halt resumes execution") {
+    int execution_count = 0;
+
+    auto tree =
+        Builder().action([&execution_count](Blackboard &) -> Status {
+                   execution_count++;
+                   return Status::Running;
+               }).build();
+
+    CHECK(tree.tick() == Status::Running);
+    CHECK(execution_count == 1);
+
+    tree.halt(); // Should not permanently halt the action
+
+    CHECK(tree.tick() == Status::Running);
+    CHECK(execution_count == 2);
 }

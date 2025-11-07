@@ -313,7 +313,6 @@ int main() {
                                  std::cout << "Action returns FAILURE" << std::endl;
                                  return Status::Failure; // Will be inverted to Success
                              })
-                             .end()
                              .build();
 
     Status inverted = inverter_demo.tick();
@@ -327,12 +326,14 @@ int main() {
                            .action([&repeat_counter](Blackboard &bb) -> Status {
                                repeat_counter++;
                                std::cout << "Execution #" << repeat_counter << std::endl;
-                               return Status::Failure; // Will be repeated
+                               return Status::Success;
                            })
-                           .end()
                            .build();
 
-    repeat_demo.tick();
+    Status repeat_status = Status::Running;
+    while (repeat_status == Status::Running) {
+        repeat_status = repeat_demo.tick();
+    }
 
     // Succeeder - always returns success
     std::cout << "\n✅ Succeeder Demo:" << std::endl;
@@ -342,7 +343,6 @@ int main() {
                                   std::cout << "Action that fails but succeeder overrides" << std::endl;
                                   return Status::Failure; // Will become Success
                               })
-                              .end()
                               .build();
 
     Status succ_result = succeeder_demo.tick();

@@ -324,7 +324,6 @@ int main() {
                 return Status::Failure;
             })
             .end()
-            .end()
 
             // Wait and monitor before next optimization cycle
             .action([&wait_start, &wait_started](Blackboard &bb) -> Status {

@@ -6,6 +6,7 @@
 #include "nodes/sequence.hpp"
 #include "tree.hpp"
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace bonsai::tree {

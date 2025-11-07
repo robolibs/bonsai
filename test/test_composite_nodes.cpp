@@ -1,9 +1,28 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <bonsai/bonsai.hpp>
 #include <doctest/doctest.h>
+#include <functional>
 #include <memory>
 
 using namespace bonsai::tree;
+
+namespace {
+    struct TrackingNode : Node {
+        std::function<Status()> behavior;
+        int haltCount = 0;
+
+        Status tick(Blackboard &) override {
+            return behavior ? behavior() : Status::Success;
+        }
+
+        void reset() override { halted_ = false; }
+
+        void halt() override {
+            ++haltCount;
+            halted_ = true;
+        }
+    };
+} // namespace
 
 TEST_CASE("Sequence node behavior") {
     Blackboard bb;
@@ -184,4 +203,53 @@ TEST_CASE("Composite node reset") {
 
     CHECK(sequence.tick(bb) == Status::Success);
     CHECK(execution_count == 3);
+}
+
+TEST_CASE("Parallel node robustness") {
+    Blackboard bb;
+
+    SUBCASE("Halts running children when a failure policy triggers") {
+        auto runningNode = std::make_shared<TrackingNode>();
+        int runningTicks = 0;
+        Status runningStatus = Status::Running;
+        runningNode->behavior = [&]() {
+            ++runningTicks;
+            return runningStatus;
+        };
+
+        auto failingNode = std::make_shared<TrackingNode>();
+        failingNode->behavior = []() { return Status::Failure; };
+
+        Parallel parallel(Parallel::Policy::RequireAll, Parallel::Policy::RequireOne);
+        parallel.addChild(runningNode);
+        parallel.addChild(failingNode);
+
+        CHECK(parallel.tick(bb) == Status::Failure);
+        CHECK(runningNode->haltCount == 1);
+        CHECK(runningTicks == 1);
+
+        runningStatus = Status::Success;
+        failingNode->behavior = []() { return Status::Success; };
+
+        CHECK(parallel.tick(bb) == Status::Success);
+    }
+
+    SUBCASE("Tracks child success across ticks") {
+        auto slowNode = std::make_shared<TrackingNode>();
+        int slowTicks = 0;
+        slowNode->behavior = [&]() {
+            ++slowTicks;
+            return (slowTicks >= 2) ? Status::Success : Status::Running;
+        };
+
+        auto fastNode = std::make_shared<TrackingNode>();
+        fastNode->behavior = []() { return Status::Success; };
+
+        Parallel parallel(Parallel::Policy::RequireAll, Parallel::Policy::RequireOne);
+        parallel.addChild(slowNode);
+        parallel.addChild(fastNode);
+
+        CHECK(parallel.tick(bb) == Status::Running);
+        CHECK(parallel.tick(bb) == Status::Success);
+    }
 }

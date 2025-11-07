@@ -17,7 +17,10 @@ namespace bonsai::tree {
 
       private:
         std::vector<NodePtr> children_;
+        std::vector<Status> childStates_;
         Policy successPolicy_, failurePolicy_;
+
+        void haltRunningChildren();
     };
 
 } // namespace bonsai::tree

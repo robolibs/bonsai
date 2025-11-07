@@ -5,29 +5,53 @@ namespace bonsai::tree {
     Parallel::Parallel(Policy successPolicy, Policy failurePolicy)
         : successPolicy_(successPolicy), failurePolicy_(failurePolicy) {}
 
-    void Parallel::addChild(const NodePtr &child) { children_.emplace_back(child); }
+    void Parallel::addChild(const NodePtr &child) {
+        children_.emplace_back(child);
+        childStates_.emplace_back(Status::Idle);
+    }
 
     Status Parallel::tick(Blackboard &blackboard) {
         if (halted_)
             return Status::Failure;
 
+        if (children_.empty())
+            return Status::Success;
+
         size_t success = 0, failure = 0;
-        for (auto &child : children_) {
-            Status status = child->tick(blackboard);
+        for (size_t i = 0; i < children_.size(); ++i) {
+            if (childStates_[i] == Status::Success || childStates_[i] == Status::Failure) {
+                if (childStates_[i] == Status::Success)
+                    ++success;
+                else
+                    ++failure;
+                continue;
+            }
+
+            Status status = children_[i]->tick(blackboard);
+            childStates_[i] = status;
+
             if (status == Status::Success)
                 ++success;
             else if (status == Status::Failure)
                 ++failure;
         }
 
-        if ((successPolicy_ == Policy::RequireAll && success == children_.size()) ||
-            (successPolicy_ == Policy::RequireOne && success > 0)) {
-            return Status::Success;
+        bool successCondition = (successPolicy_ == Policy::RequireAll && success == children_.size()) ||
+                                (successPolicy_ == Policy::RequireOne && success > 0);
+        if (successCondition) {
+            haltRunningChildren();
+            auto result = Status::Success;
+            reset();
+            return result;
         }
 
-        if ((failurePolicy_ == Policy::RequireAll && failure == children_.size()) ||
-            (failurePolicy_ == Policy::RequireOne && failure > 0)) {
-            return Status::Failure;
+        bool failureCondition = (failurePolicy_ == Policy::RequireAll && failure == children_.size()) ||
+                                (failurePolicy_ == Policy::RequireOne && failure > 0);
+        if (failureCondition) {
+            haltRunningChildren();
+            auto result = Status::Failure;
+            reset();
+            return result;
         }
 
         return Status::Running;
@@ -35,15 +59,27 @@ namespace bonsai::tree {
 
     void Parallel::reset() {
         halted_ = false;
-        for (auto &child : children_) {
-            child->reset();
+        for (size_t i = 0; i < children_.size(); ++i) {
+            childStates_[i] = Status::Idle;
+            children_[i]->reset();
         }
     }
 
     void Parallel::halt() {
         halted_ = true;
-        for (auto &child : children_) {
-            child->halt();
+        haltRunningChildren();
+        for (size_t i = 0; i < children_.size(); ++i) {
+            children_[i]->reset();
+            childStates_[i] = Status::Idle;
+        }
+    }
+
+    void Parallel::haltRunningChildren() {
+        for (size_t i = 0; i < children_.size(); ++i) {
+            if (childStates_[i] == Status::Running) {
+                children_[i]->halt();
+                childStates_[i] = Status::Idle;
+            }
         }
     }
 

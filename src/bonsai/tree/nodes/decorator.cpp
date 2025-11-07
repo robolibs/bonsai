@@ -29,31 +29,26 @@ namespace bonsai::tree {
         if (halted_)
             return Status::Failure;
 
-        while (maxTimes_ <= 0 || currentCount_ < maxTimes_) {
-            Status childStatus = child_->tick(blackboard);
+        Status childStatus = child_->tick(blackboard);
 
-            if (childStatus == Status::Running) {
-                return Status::Running;
-            }
+        if (childStatus == Status::Running)
+            return Status::Running;
 
-            if (childStatus == Status::Failure) {
-                currentCount_ = 0; // Reset on failure
-                return Status::Failure;
-            }
-
-            // Success - increment count and continue or finish
-            currentCount_++;
-            child_->reset(); // Reset child for next iteration
-
-            if (maxTimes_ > 0 && currentCount_ >= maxTimes_) {
-                currentCount_ = 0; // Reset for next use
-                return Status::Success;
-            }
-
-            // Continue repeating (infinite loop case)
+        if (childStatus == Status::Failure) {
+            currentCount_ = 0;
+            return Status::Failure;
         }
 
-        return Status::Success;
+        ++currentCount_;
+
+        if (maxTimes_ > 0 && currentCount_ >= maxTimes_) {
+            currentCount_ = 0;
+            child_->reset();
+            return Status::Success;
+        }
+
+        child_->reset();
+        return Status::Running;
     }
 
     void RepeatDecorator::reset() {
@@ -64,6 +59,7 @@ namespace bonsai::tree {
 
     void RepeatDecorator::halt() {
         halted_ = true;
+        currentCount_ = 0;
         child_->halt();
     }
 
@@ -75,31 +71,25 @@ namespace bonsai::tree {
         if (halted_)
             return Status::Failure;
 
-        while (maxTimes_ <= 0 || currentAttempts_ < maxTimes_) {
-            Status childStatus = child_->tick(blackboard);
+        Status childStatus = child_->tick(blackboard);
 
-            if (childStatus == Status::Running) {
-                return Status::Running;
-            }
+        if (childStatus == Status::Running)
+            return Status::Running;
 
-            if (childStatus == Status::Success) {
-                currentAttempts_ = 0; // Reset on success
-                return Status::Success;
-            }
-
-            // Failure - increment attempts and continue or finish
-            currentAttempts_++;
-            child_->reset(); // Reset child for next attempt
-
-            if (maxTimes_ > 0 && currentAttempts_ >= maxTimes_) {
-                currentAttempts_ = 0; // Reset for next use
-                return Status::Failure;
-            }
-
-            // Continue retrying
+        if (childStatus == Status::Success) {
+            currentAttempts_ = 0;
+            return Status::Success;
         }
 
-        return Status::Failure;
+        ++currentAttempts_;
+        child_->reset();
+
+        if (maxTimes_ > 0 && currentAttempts_ >= maxTimes_) {
+            currentAttempts_ = 0;
+            return Status::Failure;
+        }
+
+        return Status::Running;
     }
 
     void RetryDecorator::reset() {
@@ -110,6 +100,7 @@ namespace bonsai::tree {
 
     void RetryDecorator::halt() {
         halted_ = true;
+        currentAttempts_ = 0;
         child_->halt();
     }
 
