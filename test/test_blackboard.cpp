@@ -5,7 +5,7 @@
 #include <thread>
 #include <vector>
 
-using namespace bonsai;
+using namespace bonsai::tree;
 
 TEST_CASE("Blackboard basic operations") {
     Blackboard bb;

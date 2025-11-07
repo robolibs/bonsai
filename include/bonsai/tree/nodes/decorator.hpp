@@ -4,7 +4,7 @@
 #include <functional>
 #include <memory>
 
-namespace bonsai {
+namespace bonsai::tree {
 
     class Decorator : public Node {
       public:
@@ -262,4 +262,4 @@ namespace bonsai {
         int currentAttempts_;
     };
 
-} // namespace bonsai
+} // namespace bonsai::tree

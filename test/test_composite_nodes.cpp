@@ -3,7 +3,7 @@
 #include <doctest/doctest.h>
 #include <memory>
 
-using namespace bonsai;
+using namespace bonsai::tree;
 
 TEST_CASE("Sequence node behavior") {
     Blackboard bb;

@@ -4,7 +4,7 @@
 #include <doctest/doctest.h>
 #include <thread>
 
-using namespace bonsai;
+using namespace bonsai::tree;
 
 // Helper class to simulate a robot for testing
 class TestRobot {

@@ -2,7 +2,7 @@
 #include <bonsai/bonsai.hpp>
 #include <doctest/doctest.h>
 
-using namespace bonsai;
+using namespace bonsai::tree;
 
 TEST_CASE("Action node basic functionality") {
     Blackboard bb;

@@ -16,7 +16,7 @@
 #include <thread>
 #include <vector>
 
-using namespace bonsai;
+using namespace bonsai::tree;
 
 void printSeparator(const std::string &title) {
     std::cout << "\n" << std::string(60, '=') << std::endl;

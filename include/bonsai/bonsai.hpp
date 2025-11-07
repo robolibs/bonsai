@@ -1,18 +1,18 @@
 #pragma once
 
 // Core structures
-#include "structure/status.hpp"
-#include "structure/blackboard.hpp"
-#include "structure/node.hpp"
+#include "tree/structure/blackboard.hpp"
+#include "tree/structure/node.hpp"
+#include "tree/structure/status.hpp"
 
 // Node types
-#include "nodes/action.hpp"
-#include "nodes/sequence.hpp"
-#include "nodes/selector.hpp"
-#include "nodes/parallel.hpp"
-#include "nodes/decorator.hpp"
-#include "nodes/utility.hpp"
+#include "tree/nodes/action.hpp"
+#include "tree/nodes/decorator.hpp"
+#include "tree/nodes/parallel.hpp"
+#include "tree/nodes/selector.hpp"
+#include "tree/nodes/sequence.hpp"
+#include "tree/nodes/utility.hpp"
 
 // Tree and builder
-#include "tree.hpp"
-#include "builder.hpp"
+#include "tree/builder.hpp"
+#include "tree/tree.hpp"

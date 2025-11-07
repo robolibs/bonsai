@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-namespace bonsai {
+namespace bonsai::tree {
 
     class Builder {
       public:
@@ -123,4 +123,4 @@ namespace bonsai {
         int pendingRetry_ = -2;  // -2 means no retry pending, -1 means infinite retry
     };
 
-} // namespace bonsai
+} // namespace bonsai::tree
