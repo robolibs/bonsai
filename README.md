@@ -2,15 +2,16 @@
 
 # Bonsai
 
-A lightweight, header-only C++20 behavior tree library designed for AI decision-making systems.
+A lightweight, header-only C++20 AI orchestration toolkit that ships both behavior trees *and* finite state machines backed by the same blackboard.
 
 ## Features
 
-- **Header-only**: Simple integration, just include the main header
-- **Modern C++20**: Takes advantage of concepts, ranges, and other modern features
-- **Thread-safe**: Blackboard provides safe concurrent access to shared data
-- **Extensible**: Easy to add custom node types and behaviors
-- **Fluent API**: Builder pattern for intuitive tree construction
+- **Dual decision systems** – Compose complex logic with `tree::Builder` behavior trees or `state::Builder` finite state machines without leaving the API surface.
+- **Shared blackboard** – Thread-safe data store that both systems use for coordination, event passing, and debugging hooks.
+- **Modern C++20** – Uses concepts, ranges, lambdas, and strong typing throughout the public API.
+- **Header-only & extensible** – Drop in `<bonsai/bonsai.hpp>`, derive custom nodes/states, or inject callbacks.
+- **Fluent builders** – Chainable DSL for declaring sequences/selectors, decorators, states, transitions, and guards in one place.
+- **Production niceties** – Repeat/retry decorators, scoped blackboard overrides, guard/cannot happen transitions, and lifecycle observability baked in.
 
 ## 🚀 Quick Start
 
@@ -27,7 +28,7 @@ cmake --build build
 ./build/getting_started_tutorial
 ```
 
-### Simple Example
+### Behavior Tree in 20 Lines
 
 ```cpp
 #include <bonsai/bonsai.hpp>
@@ -56,14 +57,104 @@ int main() {
 }
 ```
 
+### Finite State Machine Snapshot
+
+```cpp
+#include <bonsai/bonsai.hpp>
+
+using namespace bonsai;
+
+int main() {
+    auto machine = state::Builder()
+                       .initial("idle")
+                       .state("idle")
+                       .onEnter([](tree::Blackboard &) { std::puts("🧍 idle"); })
+                       .transitionTo("run", [](tree::Blackboard &bb) { return bb.get<bool>("wants_run").value_or(false); })
+                       .state("run")
+                       .onEnter([](tree::Blackboard &bb) {
+                           std::puts("🏃 sprinting");
+                           bb.set("stamina", 100);
+                       })
+                       .onUpdate([](tree::Blackboard &bb) {
+                           auto stamina = bb.get<int>("stamina").value_or(0);
+                           bb.set("stamina", stamina - 10);
+                       })
+                       .transitionTo("idle", [](tree::Blackboard &bb) { return bb.get<int>("stamina").value_or(0) <= 0; })
+                       .build();
+
+    machine->blackboard().set("wants_run", true);
+    for (int i = 0; i < 15; ++i) {
+        machine->tick();
+    }
+}
+```
+
+### Mini Cookbook (lifted from `examples/`)
+
+#### Battery-aware robot (behavior tree)
+
+```cpp
+auto tree = tree::Builder()
+                .selector()
+                .sequence() // charge when low
+                .action([&robot](Blackboard &) {
+                    return robot.battery < 20.0 ? Status::Success : Status::Failure;
+                })
+                .action([&robot](Blackboard &) {
+                    robot.isCharging = true;
+                    return robot.battery >= 90.0 ? Status::Success : Status::Running;
+                })
+                .end()
+                .action([&pid](Blackboard &) { return pid.update(); }) // otherwise chase PID target
+                .end()
+                .build();
+```
+
+#### Utility selector (behavior tree)
+
+```cpp
+auto selector = std::make_shared<tree::UtilitySelector>();
+selector->addChild(std::make_shared<tree::Action>([](Blackboard &) {
+                       std::puts("🍎 Eat");
+                       return Status::Success;
+                   }),
+                   [](Blackboard &bb) { return bb.get<float>("hunger").value_or(0.0f); });
+selector->addChild(std::make_shared<tree::Action>([](Blackboard &) {
+                       std::puts("💤 Sleep");
+                       return Status::Success;
+                   }),
+                   [](Blackboard &bb) { return bb.get<float>("tiredness").value_or(0.0f); });
+tree::Tree brain(selector);
+brain.blackboard().set("hunger", 0.8f);
+brain.tick(); // Picks the action with the highest utility
+```
+
+#### Guarded door lock (state machine)
+
+```cpp
+auto door = state::Builder()
+                .initial("locked")
+                .state("locked")
+                .transitionTo("unlocked", [](tree::Blackboard &bb) { return bb.has("pin"); })
+                .state("unlocked")
+                .onGuard([](tree::Blackboard &bb) {
+                    return bb.get<std::string>("pin").value_or("") == "1234";
+                })
+                .onEnter([](tree::Blackboard &) { std::puts("Door opened"); })
+                .build();
+door->blackboard().set("pin", "1234");
+door->tick(); // Guard passes, enter unlocked state
+```
+
 ## Core Concepts Reference
 
-### Status Values
+### Behavior Tree Status Values
+
 - `Status::Success` - Node completed successfully
 - `Status::Failure` - Node failed to complete  
 - `Status::Running` - Node is still executing (for async operations)
 
-### Node Types
+### Behavior Tree Node Types
 
 #### Composite Nodes
 - **Sequence**: Executes children in order, succeeds when all succeed
@@ -78,6 +169,13 @@ int main() {
 
 #### Leaf Nodes
 - **Action**: Executes custom logic
+
+### State Machine Building Blocks
+
+- **States** – Provide `onGuard`, `onEnter`, `onUpdate`, and `onExit` callbacks. Use `state::CbState::create` for quick lambda-only states.
+- **Transitions** – Attach `transitionTo("target", condition)` to the current state. Conditions receive the shared blackboard.
+- **Special transitions** – `.ignoreEvent()` keeps the current state; `.cannotHappen()` raises if triggered for easier debugging.
+- **Lifecycle** – `state::StateMachine::tick()` evaluates guards, runs `onEnter` once per transition, and pumps `onUpdate` each tick.
 
 ### Blackboard
 
@@ -115,6 +213,13 @@ This is a header-only library. Simply include the main header:
 #include <bonsai/bonsai.hpp>
 ```
 
+Both behavior trees and state machines are available out of the box:
+
+```cpp
+bonsai::tree::Builder btBuilder;
+bonsai::state::Builder smBuilder;
+```
+
 ### Building Examples
 
 ```bash
@@ -136,6 +241,8 @@ make
 The `examples/` directory contains comprehensive demonstrations:
 
 - **`getting_started_tutorial.cpp`** - 🌟 **START HERE!** Interactive step-by-step tutorial
+- **`state_machine_demo.cpp`** - Traffic lights, characters, and enemy AI finite state machines
+- **`state_lifecycle_demo.cpp`** - Guard/enter/update/exit walkthrough with door-lock logic
 - **`main.cpp`** - Robot navigation with PID controllers
 - **`utility_demo.cpp`** - AI decision making with utility functions  
 - **`comprehensive_test.cpp`** - Full feature test suite
