@@ -23,6 +23,12 @@ namespace bonsai::state {
         }
 
         // Set callbacks for the current state
+        Builder &onGuard(State::GuardFunc func) {
+            ensureCurrentState("onGuard");
+            states_[currentStateName_]->setOnGuard(std::move(func));
+            return *this;
+        }
+
         Builder &onEnter(State::Func func) {
             ensureCurrentState("onEnter");
             states_[currentStateName_]->setOnEnter(std::move(func));
@@ -50,7 +56,21 @@ namespace bonsai::state {
                 states_[targetStateName] = std::make_shared<State>(targetStateName);
             }
 
-            pendingTransitions_.push_back({currentStateName_, targetStateName, std::move(condition)});
+            pendingTransitions_.push_back(PendingTransition(currentStateName_, targetStateName, std::move(condition)));
+            return *this;
+        }
+
+        // Mark transition as ignored (event is ignored, no state change)
+        Builder &ignoreEvent() {
+            ensureCurrentState("ignoreEvent");
+            pendingTransitions_.push_back(PendingTransition(currentStateName_, TransitionResult::EVENT_IGNORED));
+            return *this;
+        }
+
+        // Mark transition as cannot happen (triggers error if attempted)
+        Builder &cannotHappen() {
+            ensureCurrentState("cannotHappen");
+            pendingTransitions_.push_back(PendingTransition(currentStateName_, TransitionResult::CANNOT_HAPPEN));
             return *this;
         }
 
@@ -80,8 +100,14 @@ namespace bonsai::state {
             machine->setInitialState(states_[initialStateName_]);
 
             // Add all transitions
-            for (const auto &[fromName, toName, condition] : pendingTransitions_) {
-                machine->addTransition(states_[fromName], states_[toName], condition);
+            for (const auto &trans : pendingTransitions_) {
+                if (trans.result == TransitionResult::VALID) {
+                    machine->addTransition(states_[trans.from], states_[trans.to], trans.condition);
+                } else {
+                    // EVENT_IGNORED or CANNOT_HAPPEN
+                    auto transition = std::make_shared<Transition>(states_[trans.from], trans.result);
+                    machine->addTransition(transition);
+                }
             }
 
             return machine;
@@ -98,6 +124,13 @@ namespace bonsai::state {
             std::string from;
             std::string to;
             Transition::Condition condition;
+            TransitionResult result;
+
+            PendingTransition(std::string f, std::string t, Transition::Condition c)
+                : from(std::move(f)), to(std::move(t)), condition(std::move(c)), result(TransitionResult::VALID) {}
+
+            PendingTransition(std::string f, TransitionResult r)
+                : from(std::move(f)), to(""), condition(nullptr), result(r) {}
         };
 
         std::string currentStateName_;

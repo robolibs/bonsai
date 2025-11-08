@@ -54,6 +54,17 @@ namespace bonsai::state {
         // Check for transitions
         auto possibleTransitions = getTransitionsFrom(currentState_);
         for (const auto &transition : possibleTransitions) {
+            // Validate the transition first
+            if (transition->cannotHappen()) {
+                transition->validate(); // This will throw
+            }
+
+            // Skip ignored events
+            if (transition->isIgnored()) {
+                continue;
+            }
+
+            // Check if transition should occur
             if (transition->shouldTransition(blackboard_)) {
                 transitionTo(transition->to());
                 break; // Take first valid transition
@@ -79,6 +90,11 @@ namespace bonsai::state {
 
     void StateMachine::transitionTo(const StatePtr &newState) {
         if (!newState) {
+            return;
+        }
+
+        // Check guard condition - if false, don't transition
+        if (!newState->onGuard(blackboard_)) {
             return;
         }
 

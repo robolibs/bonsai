@@ -9,9 +9,17 @@ namespace bonsai::state {
     class State {
       public:
         using Func = std::function<void(tree::Blackboard &)>;
+        using GuardFunc = std::function<bool(tree::Blackboard &)>;
 
         explicit State(std::string name) : name_(std::move(name)) {}
         virtual ~State() = default;
+
+        // Guard condition - returns true if state should execute
+        virtual bool onGuard(tree::Blackboard &blackboard) {
+            if (onGuardFunc_)
+                return onGuardFunc_(blackboard);
+            return true; // Default: allow transition
+        }
 
         // State lifecycle callbacks
         virtual void onEnter(tree::Blackboard &blackboard) {
@@ -30,6 +38,7 @@ namespace bonsai::state {
         }
 
         // Setters for callbacks
+        void setOnGuard(GuardFunc func) { onGuardFunc_ = std::move(func); }
         void setOnEnter(Func func) { onEnterFunc_ = std::move(func); }
         void setOnUpdate(Func func) { onUpdateFunc_ = std::move(func); }
         void setOnExit(Func func) { onExitFunc_ = std::move(func); }
@@ -39,6 +48,7 @@ namespace bonsai::state {
 
       protected:
         std::string name_;
+        GuardFunc onGuardFunc_;
         Func onEnterFunc_;
         Func onUpdateFunc_;
         Func onExitFunc_;
