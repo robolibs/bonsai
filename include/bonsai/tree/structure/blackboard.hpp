@@ -43,32 +43,44 @@ namespace bonsai::tree {
         };
 
         template <typename T> inline void set(const std::string &key, T value) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            Entry entry{std::make_any<T>(std::move(value)), std::type_index(typeid(T))};
-            scopes_.back()[key] = std::move(entry);
-            notify({Event::Type::Set, key, std::type_index(typeid(T)), true, scopes_.size() - 1});
+            Observer observerCopy;
+            Event event{Event::Type::Set, key, std::type_index(typeid(T)), true, 0};
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                Entry entry{std::make_any<T>(std::move(value)), std::type_index(typeid(T))};
+                scopes_.back()[key] = std::move(entry);
+                observerCopy = observer_;
+                event.scopeDepth = scopes_.size() - 1;
+            }
+            notify(observerCopy, event);
         }
 
         template <typename T> inline std::optional<T> get(const std::string &key) const {
-            std::lock_guard<std::mutex> lock(mutex_);
-            auto [entry, depth] = findEntry(key);
-            if (!entry) {
-                notify({Event::Type::Get, key, std::type_index(typeid(T)), false, depth});
-                return std::nullopt;
+            Observer observerCopy;
+            Event event{Event::Type::Get, key, std::type_index(typeid(T)), false, 0};
+            std::optional<T> result;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                observerCopy = observer_;
+                auto [entry, depth] = findEntry(key);
+                event.scopeDepth = depth;
+                if (!entry) {
+                    // Keep failure event with requested type
+                } else if (entry->type != std::type_index(typeid(T))) {
+                    event.valueType = std::type_index(typeid(T));
+                } else {
+                    try {
+                        result = std::any_cast<T>(entry->value);
+                        event.valueType = entry->type;
+                        event.success = true;
+                    } catch (const std::bad_any_cast &) {
+                        event.valueType = entry->type;
+                        event.success = false;
+                    }
+                }
             }
-
-            if (entry->type != std::type_index(typeid(T))) {
-                notify({Event::Type::Get, key, std::type_index(typeid(T)), false, depth});
-                return std::nullopt;
-            }
-
-            try {
-                notify({Event::Type::Get, key, entry->type, true, depth});
-                return std::any_cast<T>(entry->value);
-            } catch (const std::bad_any_cast &) {
-                notify({Event::Type::Get, key, entry->type, false, depth});
-                return std::nullopt;
-            }
+            notify(observerCopy, event);
+            return result;
         }
 
         inline bool has(const std::string &key) const {
@@ -77,16 +89,27 @@ namespace bonsai::tree {
         }
 
         inline void remove(const std::string &key) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            auto &current = scopes_.back();
-            bool removed = current.erase(key) > 0;
-            notify({Event::Type::Remove, key, std::type_index(typeid(void)), removed, scopes_.size() - 1});
+            Observer observerCopy;
+            Event event{Event::Type::Remove, key, std::type_index(typeid(void)), false, 0};
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                auto &current = scopes_.back();
+                event.success = current.erase(key) > 0;
+                event.scopeDepth = scopes_.size() - 1;
+                observerCopy = observer_;
+            }
+            notify(observerCopy, event);
         }
 
         inline void clear() {
-            std::lock_guard<std::mutex> lock(mutex_);
-            scopes_.assign(1, {});
-            notify({Event::Type::Clear, "", std::type_index(typeid(void)), true, 0});
+            Observer observerCopy;
+            Event event{Event::Type::Clear, "", std::type_index(typeid(void)), true, 0};
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                scopes_.assign(1, {});
+                observerCopy = observer_;
+            }
+            notify(observerCopy, event);
         }
 
         ScopeToken pushScope();
@@ -113,9 +136,9 @@ namespace bonsai::tree {
             return {nullptr, scopes_.size()};
         }
 
-        inline void notify(const Event &event) const {
-            if (observer_)
-                observer_(event);
+        inline void notify(const Observer &observer, const Event &event) const {
+            if (observer)
+                observer(event);
         }
 
         mutable std::mutex mutex_;
@@ -150,18 +173,35 @@ namespace bonsai::tree {
     }
 
     inline Blackboard::ScopeToken Blackboard::pushScope() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        scopes_.emplace_back();
-        notify({Event::Type::ScopePushed, "", std::type_index(typeid(void)), true, scopes_.size() - 1});
-        return ScopeToken(this, scopes_.size() - 1);
+        Observer observerCopy;
+        size_t depth = 0;
+        Event event{Event::Type::ScopePushed, "", std::type_index(typeid(void)), true, 0};
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            scopes_.emplace_back();
+            depth = scopes_.size() - 1;
+            event.scopeDepth = depth;
+            observerCopy = observer_;
+        }
+        notify(observerCopy, event);
+        return ScopeToken(this, depth);
     }
 
     inline void Blackboard::popScope() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (scopes_.size() <= 1)
-            return;
-        scopes_.pop_back();
-        notify({Event::Type::ScopePopped, "", std::type_index(typeid(void)), true, scopes_.size() - 1});
+        Observer observerCopy;
+        Event event{Event::Type::ScopePopped, "", std::type_index(typeid(void)), true, 0};
+        bool shouldNotify = false;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (scopes_.size() <= 1)
+                return;
+            scopes_.pop_back();
+            event.scopeDepth = scopes_.size() - 1;
+            observerCopy = observer_;
+            shouldNotify = true;
+        }
+        if (shouldNotify)
+            notify(observerCopy, event);
     }
 
     inline void Blackboard::setObserver(Observer observer) {

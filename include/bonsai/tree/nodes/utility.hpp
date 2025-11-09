@@ -47,6 +47,7 @@ namespace bonsai::tree {
 
       private:
         std::vector<WeightedChild> children_;
+        size_t currentIndex_ = SIZE_MAX;
     };
 
 } // namespace bonsai::tree

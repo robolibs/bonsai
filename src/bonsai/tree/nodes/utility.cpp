@@ -77,6 +77,15 @@ namespace bonsai::tree {
 
         state_ = State::Running;
 
+        if (currentIndex_ < children_.size()) {
+            Status activeResult = children_[currentIndex_].node->tick(blackboard);
+            if (activeResult != Status::Running) {
+                state_ = State::Idle;
+                currentIndex_ = SIZE_MAX;
+            }
+            return activeResult;
+        }
+
         // Calculate total weight
         float totalWeight = 0.0f;
         std::vector<float> weights;
@@ -88,8 +97,11 @@ namespace bonsai::tree {
             totalWeight += weight;
         }
 
-        if (totalWeight <= 0.0f)
+        if (totalWeight <= 0.0f) {
+            state_ = State::Idle;
+            currentIndex_ = SIZE_MAX;
             return Status::Failure;
+        }
 
         // Select random child based on weights
         float random = static_cast<float>(rand()) / RAND_MAX * totalWeight;
@@ -99,16 +111,24 @@ namespace bonsai::tree {
             accumulator += weights[i];
             if (random <= accumulator) {
                 Status result = children_[i].node->tick(blackboard);
-                if (result != Status::Running)
+                if (result == Status::Running) {
+                    currentIndex_ = i;
+                } else {
                     state_ = State::Idle;
+                    currentIndex_ = SIZE_MAX;
+                }
                 return result;
             }
         }
 
         // Fallback to last child
         Status result = children_.back().node->tick(blackboard);
-        if (result != Status::Running)
+        if (result == Status::Running) {
+            currentIndex_ = children_.size() - 1;
+        } else {
             state_ = State::Idle;
+            currentIndex_ = SIZE_MAX;
+        }
         return result;
     }
 
@@ -117,6 +137,7 @@ namespace bonsai::tree {
         for (auto &child : children_) {
             child.node->reset();
         }
+        currentIndex_ = SIZE_MAX;
     }
 
     void WeightedRandomSelector::halt() {
@@ -124,6 +145,7 @@ namespace bonsai::tree {
         for (auto &child : children_) {
             child.node->halt();
         }
+        currentIndex_ = SIZE_MAX;
     }
 
 } // namespace bonsai::tree

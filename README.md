@@ -2,16 +2,16 @@
 
 # Bonsai
 
-A lightweight, header-only C++20 AI orchestration toolkit that ships both behavior trees *and* finite state machines backed by the same blackboard.
+A lightweight C++20 AI orchestration toolkit that ships both behavior trees *and* finite state machines backed by the same blackboard.
 
 ## Features
 
 - **Dual decision systems** – Compose complex logic with `tree::Builder` behavior trees or `state::Builder` finite state machines without leaving the API surface.
 - **Shared blackboard** – Thread-safe data store that both systems use for coordination, event passing, and debugging hooks.
 - **Modern C++20** – Uses concepts, ranges, lambdas, and strong typing throughout the public API.
-- **Header-only & extensible** – Drop in `<bonsai/bonsai.hpp>`, derive custom nodes/states, or inject callbacks.
+- **Lightweight & extensible** – Include `<bonsai/bonsai.hpp>`, derive custom nodes/states, or inject callbacks.
 - **Fluent builders** – Chainable DSL for declaring sequences/selectors, decorators, states, transitions, and guards in one place.
-- **Production niceties** – Repeat/retry decorators, scoped blackboard overrides, guard/cannot happen transitions, and lifecycle observability baked in.
+- **Production niceties** – Repeat/retry decorators, timeout/cooldown support, scoped blackboard overrides, guard/cannot happen transitions, and lifecycle observability baked in.
 
 ## 🚀 Quick Start
 
@@ -33,7 +33,7 @@ cmake --build build
 ```cpp
 #include <bonsai/bonsai.hpp>
 
-using namespace bonsai;
+using namespace bonsai::tree;
 
 int main() {
     // Create a simple behavior tree
@@ -113,18 +113,25 @@ auto tree = tree::Builder()
 #### Utility selector (behavior tree)
 
 ```cpp
-auto selector = std::make_shared<tree::UtilitySelector>();
-selector->addChild(std::make_shared<tree::Action>([](Blackboard &) {
-                       std::puts("🍎 Eat");
-                       return Status::Success;
-                   }),
-                   [](Blackboard &bb) { return bb.get<float>("hunger").value_or(0.0f); });
-selector->addChild(std::make_shared<tree::Action>([](Blackboard &) {
-                       std::puts("💤 Sleep");
-                       return Status::Success;
-                   }),
-                   [](Blackboard &bb) { return bb.get<float>("tiredness").value_or(0.0f); });
-tree::Tree brain(selector);
+using namespace bonsai::tree;
+
+auto selector = std::make_shared<UtilitySelector>();
+selector->addChild(
+    std::make_shared<Action>([](Blackboard &) {
+        std::puts("🍎 Eat");
+        return Status::Success;
+    }),
+    [](Blackboard &bb) { return bb.get<float>("hunger").value_or(0.0f); }
+);
+selector->addChild(
+    std::make_shared<Action>([](Blackboard &) {
+        std::puts("💤 Sleep");
+        return Status::Success;
+    }),
+    [](Blackboard &bb) { return bb.get<float>("tiredness").value_or(0.0f); }
+);
+
+Tree brain(selector);
 brain.blackboard().set("hunger", 0.8f);
 brain.tick(); // Picks the action with the highest utility
 ```
@@ -146,6 +153,30 @@ door->blackboard().set("pin", "1234");
 door->tick(); // Guard passes, enter unlocked state
 ```
 
+#### Timeout and cooldown decorators (behavior tree)
+
+```cpp
+using namespace bonsai::tree;
+
+// Timeout: fail if action takes too long
+auto tree = Builder()
+                .decorator(decorators::Timeout(5.0f)) // 5 second timeout
+                .action([](Blackboard &bb) {
+                    // Long-running operation
+                    return Status::Running;
+                })
+                .build();
+
+// Cooldown: prevent rapid re-execution
+auto cooldown_tree = Builder()
+                         .decorator(decorators::Cooldown(2.0f)) // 2 second cooldown
+                         .action([](Blackboard &bb) {
+                             std::puts("Special attack!");
+                             return Status::Success;
+                         })
+                         .build();
+```
+
 ## Core Concepts Reference
 
 ### Behavior Tree Status Values
@@ -157,18 +188,25 @@ door->tick(); // Guard passes, enter unlocked state
 ### Behavior Tree Node Types
 
 #### Composite Nodes
-- **Sequence**: Executes children in order, succeeds when all succeed
-- **Selector**: Tries children in order, succeeds when one succeeds  
-- **Parallel**: Executes all children simultaneously
+- **Sequence** (`.sequence()`): Executes children in order, succeeds when all succeed
+- **Selector** (`.selector()`): Tries children in order, succeeds when one succeeds  
+- **Parallel** (`.parallel(policy, policy)` or `.parallel(threshold)`): Executes all children simultaneously
 
 #### Decorator Nodes
-- **Inverter**: Flips Success ↔ Failure
-- **Repeater**: Retries child on failure
-- **Timeout**: Fails child after time limit
-- **Cooldown**: Prevents execution during cooldown period
+- **Inverter** (`.inverter()`): Flips Success ↔ Failure
+- **Succeeder** (`.succeeder()`): Always returns Success (except Running)
+- **Failer** (`.failer()`): Always returns Failure (except Running)
+- **Repeat** (`.repeat(n)`): Repeats successful child N times (or infinitely if n=-1)
+- **Retry** (`.retry(n)`): Retries failed child N times (or infinitely if n=-1)
+- **Custom** (`.decorator(func)`): Apply custom decorator function
+  - Available in `decorators::` namespace: `Timeout(seconds)`, `Cooldown(seconds)`, etc.
 
 #### Leaf Nodes
-- **Action**: Executes custom logic
+- **Action** (`.action(func)`): Executes custom logic
+
+#### Advanced Nodes (Manual Creation)
+- **UtilitySelector**: Selects child with highest utility score
+- **WeightedRandomSelector**: Randomly selects child weighted by utility scores
 
 ### State Machine Building Blocks
 
@@ -207,7 +245,7 @@ tree.blackboard().setObserver([](const Blackboard::Event &evt) {
 
 ## Building
 
-This is a header-only library. Simply include the main header:
+Include the main header and link against the library:
 
 ```cpp
 #include <bonsai/bonsai.hpp>
@@ -218,6 +256,26 @@ Both behavior trees and state machines are available out of the box:
 ```cpp
 bonsai::tree::Builder btBuilder;
 bonsai::state::Builder smBuilder;
+```
+
+### Using CMake
+
+```cmake
+find_package(bonsai REQUIRED)
+target_link_libraries(your_target bonsai::bonsai)
+```
+
+Or use FetchContent:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    bonsai
+    GIT_REPOSITORY https://github.com/your-repo/bonsai
+    GIT_TAG main
+)
+FetchContent_MakeAvailable(bonsai)
+target_link_libraries(your_target bonsai::bonsai)
 ```
 
 ### Building Examples
@@ -244,9 +302,10 @@ The `examples/` directory contains comprehensive demonstrations:
 - **`state_machine_demo.cpp`** - Traffic lights, characters, and enemy AI finite state machines
 - **`state_lifecycle_demo.cpp`** - Guard/enter/update/exit walkthrough with door-lock logic
 - **`main.cpp`** - Robot navigation with PID controllers
-- **`utility_demo.cpp`** - AI decision making with utility functions  
+- **`utility_demo.cpp`** - AI decision making with utility and weighted random selectors
+- **`builder_utility_demo.cpp`** - Demonstrates manual node creation with utility selectors
 - **`comprehensive_test.cpp`** - Full feature test suite
-- **`pea_harvester_demo.cpp`** - Complex real-world optimization scenario
+- **`pea_harvester_demo_fixed.cpp`** - Complex real-world optimization scenario
 
 ## Requirements
 

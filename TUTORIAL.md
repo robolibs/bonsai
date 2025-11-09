@@ -22,7 +22,7 @@ Welcome to the comprehensive Bonsai behavior tree tutorial! This guide will take
 5. [Parallel Nodes - Do Multiple Things](#lesson-5-parallel-nodes---do-multiple-things)
 6. [Decorators - Modify Behavior](#lesson-6-decorators---modify-behavior)
 7. [Real-World Example - AI Guard](#lesson-7-real-world-example---ai-guard)
-8. [Manual Node Creation](#lesson-8-manual-node-creation)
+8. [Manual Node Creation - Utility Selectors](#lesson-8-manual-node-creation)
 9. [Comprehensive Examples - All Features](#lesson-9-comprehensive-examples---all-features)
 
 ---
@@ -400,6 +400,9 @@ std::cout << "Succeeder result: " << (succ_result == Status::Success ? "SUCCESS"
 - `retry(n)`: Retries failed actions up to n times (-1 for infinite)
 - `succeeder()`: Always returns Success regardless of child result
 - `failer()`: Always returns Failure regardless of child result
+- `decorator(func)`: Apply custom decorator function
+  - Use with `decorators::Timeout(seconds)` for time-limited operations
+  - Use with `decorators::Cooldown(seconds)` to prevent rapid re-execution
 
 **Repeat vs Retry:**
 - **`repeat()`**: Use for looping behaviors like animations, patrols, or resource gathering
@@ -408,6 +411,8 @@ std::cout << "Succeeder result: " << (succ_result == Status::Success ? "SUCCESS"
 ### Practical Examples
 
 ```cpp
+using namespace bonsai::tree;
+
 // Example 1: Patrol behavior - repeat successful patrol route
 auto patrol_tree = Builder()
     .repeat(5) // Patrol 5 times
@@ -444,7 +449,7 @@ auto network_tree = Builder()
 
 // Example 3: Animation loop - repeat indefinitely until interrupted
 auto animation_tree = Builder()
-    .repeat() // Infinite repeat
+    .repeat(-1) // Infinite repeat (use -1 for infinite)
         .action([](Blackboard& bb) -> Status {
             auto should_stop = bb.get<bool>("stop_animation");
             if (should_stop.value_or(false)) {
@@ -452,6 +457,25 @@ auto animation_tree = Builder()
             }
             std::cout << "🎬 Playing animation frame" << std::endl;
             return Status::Success; // Continue repeating
+        })
+    .build();
+
+// Example 4: Timeout decorator - fail if action takes too long
+auto timeout_tree = Builder()
+    .decorator(decorators::Timeout(5.0f)) // 5 second timeout
+        .action([](Blackboard& bb) -> Status {
+            std::cout << "🕐 Long operation in progress..." << std::endl;
+            // Simulate long-running operation
+            return Status::Running;
+        })
+    .build();
+
+// Example 5: Cooldown decorator - prevent rapid re-execution
+auto special_attack = Builder()
+    .decorator(decorators::Cooldown(3.0f)) // 3 second cooldown
+        .action([](Blackboard& bb) -> Status {
+            std::cout << "⚡ SPECIAL ATTACK!" << std::endl;
+            return Status::Success;
         })
     .build();
 ```
@@ -545,9 +569,11 @@ This example demonstrates:
 
 ## Lesson 8: Manual Node Creation
 
-For advanced cases, you can create nodes manually and use utility-based selection for sophisticated AI behavior.
+For advanced cases, you can create nodes manually. Some node types like `UtilitySelector` and `WeightedRandomSelector` are only available through manual creation, not through the Builder API. This allows for sophisticated AI behavior based on utility scoring.
 
 ```cpp
+using namespace bonsai::tree;
+
 // Create a utility selector manually
 auto utilitySelector = std::make_shared<UtilitySelector>();
 
@@ -589,10 +615,12 @@ utility_tree.tick(); // Should select sleeping
 ```
 
 **Key Concepts:**
-- Manual node creation gives you full control
-- Utility-based selection chooses actions based on scored utility functions
-- Custom node types can implement sophisticated AI behaviors
-- Mix manual and builder approaches as needed
+- Manual node creation gives you full control over node types not available in Builder
+- `UtilitySelector` chooses the child with the highest utility score
+- `WeightedRandomSelector` randomly picks a child weighted by utility scores
+- Utility functions evaluate the blackboard to compute scores dynamically
+- See `examples/utility_demo.cpp` and `examples/builder_utility_demo.cpp` for complete examples
+- Mix manual and builder approaches as needed for flexibility
 
 ---
 
@@ -798,99 +826,50 @@ int main() {
     std::cout << "Repeat result: " << (rep_result == Status::Success ? "SUCCESS" : "FAILURE") << std::endl;
     
     // ========================================
-    // 6. UTILITY-BASED SELECTION - AI Decision Making
+    // 6. TIMEOUT AND COOLDOWN DECORATORS
     // ========================================
     
-    std::cout << "\n=== Utility-Based Selection ===" << std::endl;
+    std::cout << "\n=== Timeout and Cooldown Decorators ===" << std::endl;
     
-    auto utility_tree = Builder()
-        .utilitySelector()
+    // Timeout example - operation that takes too long will fail
+    auto timeout_tree = Builder()
+        .decorator(decorators::Timeout(2.0f)) // 2 second timeout
             .action([](Blackboard& bb) -> Status {
-                // Calculate utility for attacking
-                auto health = bb.get<int>("player_health");
-                auto enemy_count = bb.get<int>("enemy_count");
+                static int attempts = 0;
+                attempts++;
+                std::cout << "Long operation attempt " << attempts << "..." << std::endl;
                 
-                double utility = 0.0;
-                if (health.has_value() && enemy_count.has_value()) {
-                    // Higher utility when health is high and enemies are few
-                    utility = (health.value() / 100.0) * (1.0 / enemy_count.value());
+                if (attempts < 5) {
+                    return Status::Running; // Still working
                 }
                 
-                bb.set("utility_score", utility);
-                std::cout << "Attack option utility: " << utility << std::endl;
+                attempts = 0;
+                std::cout << "Operation completed!" << std::endl;
                 return Status::Success;
             })
-            .action([](Blackboard& bb) -> Status {
-                // Calculate utility for defending
-                auto health = bb.get<int>("player_health");
-                auto enemy_count = bb.get<int>("enemy_count");
-                
-                double utility = 0.0;
-                if (health.has_value() && enemy_count.has_value()) {
-                    // Higher utility when health is low or enemies are many
-                    utility = (1.0 - health.value() / 100.0) + (enemy_count.value() / 10.0);
-                }
-                
-                bb.set("utility_score", utility);
-                std::cout << "Defend option utility: " << utility << std::endl;
-                return Status::Success;
-            })
-            .action([](Blackboard& bb) -> Status {
-                // Calculate utility for fleeing
-                auto health = bb.get<int>("player_health");
-                auto enemy_count = bb.get<int>("enemy_count");
-                
-                double utility = 0.0;
-                if (health.has_value() && enemy_count.has_value()) {
-                    // Higher utility when health is very low
-                    utility = (health.value() < 30) ? 0.9 : 0.1;
-                }
-                
-                bb.set("utility_score", utility);
-                std::cout << "Flee option utility: " << utility << std::endl;
-                return Status::Success;
-            })
-        .end()
         .build();
     
-    std::cout << "Executing utility selector:" << std::endl;
-    Status util_result = utility_tree.tick();
-    std::cout << "Utility selector result: " << (util_result == Status::Success ? "SUCCESS" : "FAILURE") << std::endl;
+    std::cout << "Executing timeout decorator (will timeout after 2 seconds):" << std::endl;
+    Status timeout_result = timeout_tree.tick();
+    std::cout << "Timeout result: " << (timeout_result == Status::Success ? "SUCCESS" : "FAILURE") << std::endl;
     
-    // ========================================
-    // 7. WEIGHTED RANDOM SELECTION
-    // ========================================
-    
-    std::cout << "\n=== Weighted Random Selection ===" << std::endl;
-    
-    auto weighted_tree = Builder()
-        .weightedRandomSelector()
+    // Cooldown example - prevents rapid re-execution
+    auto cooldown_tree = Builder()
+        .decorator(decorators::Cooldown(1.0f)) // 1 second cooldown
             .action([](Blackboard& bb) -> Status {
-                bb.set("weight", 3.0); // High weight - more likely
-                std::cout << "Common action (weight: 3.0)" << std::endl;
+                std::cout << "⚡ Special attack executed!" << std::endl;
                 return Status::Success;
             })
-            .action([](Blackboard& bb) -> Status {
-                bb.set("weight", 1.0); // Medium weight
-                std::cout << "Uncommon action (weight: 1.0)" << std::endl;
-                return Status::Success;
-            })
-            .action([](Blackboard& bb) -> Status {
-                bb.set("weight", 0.5); // Low weight - less likely
-                std::cout << "Rare action (weight: 0.5)" << std::endl;
-                return Status::Success;
-            })
-        .end()
         .build();
     
-    std::cout << "Executing weighted random selector (3 times):" << std::endl;
-    for (int i = 0; i < 3; ++i) {
-        Status weight_result = weighted_tree.tick();
-        std::cout << "  Weighted result " << (i+1) << ": " << (weight_result == Status::Success ? "SUCCESS" : "FAILURE") << std::endl;
-    }
+    std::cout << "\nExecuting cooldown decorator:" << std::endl;
+    std::cout << "First execution:" << std::endl;
+    cooldown_tree.tick();
+    std::cout << "Immediate second execution (should fail - still in cooldown):" << std::endl;
+    cooldown_tree.tick();
     
     // ========================================
-    // 8. COMPLEX NESTED TREES - Game AI Example
+    // 7. COMPLEX NESTED TREES - Game AI Example
     // ========================================
     
     std::cout << "\n=== Complex Nested Trees ===" << std::endl;
@@ -988,7 +967,7 @@ int main() {
     }
     
     // ========================================
-    // 9. ADVANCED PATTERNS AND STATE MACHINES
+    // 8. ADVANCED PATTERNS AND STATE MACHINES
     // ========================================
     
     std::cout << "\n=== Advanced Patterns ===" << std::endl;
@@ -1054,10 +1033,14 @@ int main() {
     std::cout << "• Advanced sequence and selector patterns" << std::endl;
     std::cout << "• Parallel execution" << std::endl;
     std::cout << "• Decorator nodes (Inverter, Succeeder, Repeat, Retry)" << std::endl;
-    std::cout << "• Utility-based and weighted random selection" << std::endl;
+    std::cout << "• Timeout and cooldown decorators" << std::endl;
     std::cout << "• Complex nested tree structures" << std::endl;
     std::cout << "• Real-world AI behavior patterns" << std::endl;
     std::cout << "• State machine implementations" << std::endl;
+    
+    std::cout << "\n💡 For utility-based and weighted random selection:" << std::endl;
+    std::cout << "   See examples/utility_demo.cpp and examples/builder_utility_demo.cpp" << std::endl;
+    std::cout << "   These require manual node creation with UtilitySelector/WeightedRandomSelector" << std::endl;
     
     return 0;
 }
@@ -1073,8 +1056,10 @@ int main() {
 
 ### Common Patterns
 
-#### Guard Conditions
+#### Guard Conditions (Behavior Trees)
 ```cpp
+using namespace bonsai::tree;
+
 auto tree = Builder()
     .sequence()
         .action([](Blackboard& bb) -> Status {
@@ -1091,17 +1076,64 @@ auto tree = Builder()
     .build();
 ```
 
+#### Guard Conditions (State Machines)
+```cpp
+using namespace bonsai;
+
+auto machine = state::Builder()
+    .initial("locked")
+    .state("locked")
+    .transitionTo("unlocked", [](tree::Blackboard& bb) {
+        return bb.get<std::string>("pin").value_or("") == "1234";
+    })
+    .state("unlocked")
+    .onGuard([](tree::Blackboard& bb) {
+        // Guard must pass for state to be entered
+        return bb.get<bool>("authorized").value_or(false);
+    })
+    .onEnter([](tree::Blackboard&) {
+        std::cout << "Access granted!" << std::endl;
+    })
+    .build();
+```
+
 #### Retry Logic
 ```cpp
+using namespace bonsai::tree;
+
 auto retry_tree = Builder()
-    .repeat(3) // Try up to 3 times
+    .retry(3) // Retry up to 3 times on failure
         .action([](Blackboard& bb) -> Status {
             // Action that might fail
             auto success_chance = bb.get<double>("success_chance").value_or(0.5);
             return (rand() < success_chance * RAND_MAX) ? Status::Success : Status::Failure;
         })
-    .end()
     .build();
 ```
 
-This completes our comprehensive tutorial covering all aspects of the Bonsai behavior tree library!
+### State Machine Examples
+
+For comprehensive state machine examples, see:
+- `examples/state_machine_demo.cpp` - Traffic lights, character states, enemy AI
+- `examples/state_lifecycle_demo.cpp` - Detailed lifecycle callbacks demonstration
+
+**State Machine Quick Reference:**
+```cpp
+using namespace bonsai;
+
+auto fsm = state::Builder()
+    .initial("state_name")           // Set initial state
+    .state("state_name")             // Define a state
+    .onGuard([](tree::Blackboard&) { return true; })   // Optional: guard condition
+    .onEnter([](tree::Blackboard&) { /* ... */ })      // Optional: on state entry
+    .onUpdate([](tree::Blackboard&) { /* ... */ })     // Optional: each tick
+    .onExit([](tree::Blackboard&) { /* ... */ })       // Optional: on state exit
+    .transitionTo("target", [](tree::Blackboard&) { return true; })  // Conditional transition
+    .ignoreEvent()                   // Transition that does nothing
+    .cannotHappen()                  // Transition that throws if triggered (debugging)
+    .build();
+
+fsm->tick();  // Execute one state machine update
+```
+
+This completes our comprehensive tutorial covering all aspects of the Bonsai behavior tree and state machine library!
