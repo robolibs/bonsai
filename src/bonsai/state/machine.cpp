@@ -77,29 +77,45 @@ namespace bonsai::state {
             return;
         }
         std::vector<bool> results(possibleTransitions.size(), false);
-        // Parallel evaluation using parallel execution if available; fall back to sequential otherwise
-        static bonsai::core::ThreadPool pool;
-        pool.bulk(
-            [&](size_t k) {
+
+        // Determine max priority to allow correct early-stop when found
+        int maxPriority = std::numeric_limits<int>::min();
+        for (size_t idx : indices) {
+            maxPriority = std::max(maxPriority, possibleTransitions[idx]->getPriority());
+        }
+
+        static bonsai::core::ThreadPool defaultPool;
+        bonsai::core::ThreadPool *pool = executor_ ? executor_ : &defaultPool;
+        std::atomic<bool> stop{false};
+        pool->bulk_early_stop(
+            [&](size_t k) -> bool {
+                if (stop.load(std::memory_order_relaxed))
+                    return true;
                 size_t idx = indices[k];
-                results[idx] = possibleTransitions[idx]->shouldTransition(blackboard_);
+                bool ok = possibleTransitions[idx]->shouldTransition(blackboard_);
+                results[idx] = ok;
+                if (ok && possibleTransitions[idx]->getPriority() == maxPriority) {
+                    // Found the best possible transition; safe to stop further work
+                    return false; // signal stop
+                }
+                return true;
             },
-            indices.size());
+            indices.size(), stop);
 
         // Pick highest priority among true transitions
         int bestPriority = std::numeric_limits<int>::min();
-        size_t bestIdx = static_cast<size_t>(-1);
+        size_t chosen = static_cast<size_t>(-1);
         for (size_t i = 0; i < possibleTransitions.size(); ++i) {
             if (!results[i])
                 continue;
             int pr = possibleTransitions[i]->getPriority();
             if (pr > bestPriority) {
                 bestPriority = pr;
-                bestIdx = i;
+                chosen = i;
             }
         }
-        if (bestIdx != static_cast<size_t>(-1)) {
-            transitionTo(possibleTransitions[bestIdx]->to());
+        if (chosen != static_cast<size_t>(-1)) {
+            transitionTo(possibleTransitions[chosen]->to());
         }
     }
 

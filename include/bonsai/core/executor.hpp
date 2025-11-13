@@ -54,13 +54,32 @@ namespace bonsai::core {
         }
 
         template <class F> void bulk(F &&f, size_t n) {
-            std::atomic<size_t> cnt{0};
             std::promise<void> done;
             std::atomic<size_t> remaining{n};
             auto fut = done.get_future();
             for (size_t i = 0; i < n; ++i) {
                 submit([&, i] {
                     f(i);
+                    if (remaining.fetch_sub(1) == 1)
+                        done.set_value();
+                });
+            }
+            fut.get();
+        }
+
+        // Early-stop bulk: f(i) returns true if work should continue, false to signal stop
+        template <class F> void bulk_early_stop(F &&f, size_t n, std::atomic<bool> &stop) {
+            std::promise<void> done;
+            std::atomic<size_t> remaining{n};
+            auto fut = done.get_future();
+            for (size_t i = 0; i < n; ++i) {
+                submit([&, i] {
+                    if (!stop.load(std::memory_order_relaxed)) {
+                        bool cont = f(i);
+                        if (!cont) {
+                            stop.store(true, std::memory_order_relaxed);
+                        }
+                    }
                     if (remaining.fetch_sub(1) == 1)
                         done.set_value();
                 });

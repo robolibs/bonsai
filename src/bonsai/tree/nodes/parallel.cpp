@@ -43,18 +43,59 @@ namespace bonsai::tree {
 
         // Run child ticks in parallel where available; otherwise sequential.
         // Note: Blackboard writes are synchronized internally; parallel children may still observe each other's writes.
-        static bonsai::core::ThreadPool pool;
-        pool.bulk(
-            [&](size_t k) {
+        static bonsai::core::ThreadPool defaultPool;
+        bonsai::core::ThreadPool *pool = this->executor_ ? this->executor_ : &defaultPool;
+        std::atomic<bool> stop{false};
+        const size_t total = indices.size();
+        std::atomic<size_t> processed{0};
+        std::atomic<size_t> succ{0};
+        std::atomic<size_t> fail{0};
+        pool->bulk_early_stop(
+            [&](size_t k) -> bool {
+                if (stop.load(std::memory_order_relaxed))
+                    return true;
                 size_t i = indices[k];
                 auto prev = childStates_[i];
                 if (prev == Status::Success || prev == Status::Failure) {
-                    return; // Already resolved this child
+                    processed.fetch_add(1, std::memory_order_relaxed);
+                    return true; // skip
                 }
                 Status status = children_[i]->tick(blackboard);
                 childStates_[i] = status;
+                if (status == Status::Success)
+                    succ.fetch_add(1, std::memory_order_relaxed);
+                if (status == Status::Failure)
+                    fail.fetch_add(1, std::memory_order_relaxed);
+                size_t done = processed.fetch_add(1, std::memory_order_relaxed) + 1;
+                size_t unresolved =
+                    total - (succ.load(std::memory_order_relaxed) + fail.load(std::memory_order_relaxed));
+                // Early-stop conditions
+                if (!successThreshold_.has_value()) {
+                    if (successPolicy_ == Policy::RequireOne && status == Status::Success)
+                        return false;
+                    if (successPolicy_ == Policy::RequireAll && status == Status::Failure)
+                        return false; // cannot all succeed
+                } else {
+                    size_t s = succ.load(std::memory_order_relaxed);
+                    size_t required = successThreshold_.value();
+                    if (s >= required)
+                        return false;
+                    if (s + unresolved < required)
+                        return false; // impossible now
+                }
+                if (failureThreshold_.has_value()) {
+                    size_t f = fail.load(std::memory_order_relaxed);
+                    if (f >= failureThreshold_.value())
+                        return false;
+                } else {
+                    if (failurePolicy_ == Policy::RequireOne && status == Status::Failure)
+                        return false;
+                    // RequireAll failure early-stop is non-trivial safely; skip
+                }
+                (void)done;
+                return true;
             },
-            indices.size());
+            indices.size(), stop);
 
         // Aggregate results
         size_t success = 0, failure = 0;
