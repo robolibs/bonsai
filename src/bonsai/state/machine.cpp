@@ -1,4 +1,5 @@
 #include "bonsai/state/machine.hpp"
+#include <algorithm>
 #include <stdexcept>
 
 namespace bonsai::state {
@@ -51,8 +52,10 @@ namespace bonsai::state {
         // Update current state
         currentState_->onUpdate(blackboard_);
 
-        // Check for transitions
+        // Check for transitions - FIX: Sort by priority
         auto possibleTransitions = getTransitionsFrom(currentState_);
+        std::sort(possibleTransitions.begin(), possibleTransitions.end(),
+                  [](const TransitionPtr &a, const TransitionPtr &b) { return a->getPriority() > b->getPriority(); });
         for (const auto &transition : possibleTransitions) {
             // Validate the transition first
             if (transition->cannotHappen()) {
@@ -101,11 +104,24 @@ namespace bonsai::state {
         // Exit current state
         if (currentState_) {
             currentState_->onExit(blackboard_);
+            previousState_ = currentState_; // FIX: Track previous state
         }
 
         // Enter new state
         currentState_ = newState;
         currentState_->onEnter(blackboard_);
+
+        // FIX: Add to history
+        if (stateHistory_.size() >= MAX_HISTORY) {
+            stateHistory_.erase(stateHistory_.begin());
+        }
+        stateHistory_.push_back(newState->name());
+    }
+
+    void StateMachine::transitionToPrevious() {
+        if (previousState_) {
+            transitionTo(previousState_);
+        }
     }
 
     std::vector<TransitionPtr> StateMachine::getTransitionsFrom(const StatePtr &state) const {

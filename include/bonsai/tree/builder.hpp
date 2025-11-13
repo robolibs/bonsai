@@ -52,6 +52,7 @@ namespace bonsai::tree {
         NodePtr applyPendingDecorators(NodePtr node);
         void ensureNoPendingDecorators(const char *context) const;
         void ensureNoPendingLeafModifiers(const char *context) const;
+        void validateTree(const NodePtr &node) const;
 
         static constexpr int kNoPendingModifier = -2;
 

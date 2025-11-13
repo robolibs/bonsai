@@ -11,12 +11,17 @@ namespace bonsai::tree {
         using Func = std::function<Status(Status)>;
 
         Decorator(Func func, NodePtr child);
+        virtual ~Decorator() = default;
 
         Status tick(Blackboard &blackboard) override;
         void reset() override;
         void halt() override;
 
-      private:
+        // FIX: Add child introspection
+        NodePtr getChild() const { return child_; }
+        void setChild(NodePtr newChild) { child_ = std::move(newChild); }
+
+      protected: // Changed from private to allow derived class access
         Func func_;
         NodePtr child_;
     };

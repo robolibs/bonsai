@@ -18,10 +18,11 @@ namespace bonsai::state {
     class Transition {
       public:
         using Condition = std::function<bool(tree::Blackboard &)>;
+        using Action = std::function<void(tree::Blackboard &)>;
 
-        Transition(StatePtr from, StatePtr to, Condition condition)
+        Transition(StatePtr from, StatePtr to, Condition condition, int priority = 0)
             : from_(std::move(from)), to_(std::move(to)), condition_(std::move(condition)),
-              result_(TransitionResult::VALID) {}
+              result_(TransitionResult::VALID), priority_(priority) {}
 
         // Special constructor for EVENT_IGNORED and CANNOT_HAPPEN
         Transition(StatePtr from, TransitionResult result)
@@ -53,11 +54,21 @@ namespace bonsai::state {
         bool isIgnored() const { return result_ == TransitionResult::EVENT_IGNORED; }
         bool cannotHappen() const { return result_ == TransitionResult::CANNOT_HAPPEN; }
 
+        // FIX: Add priority and action support
+        void setAction(Action action) { action_ = std::move(action); }
+        void executeAction(tree::Blackboard &blackboard) const {
+            if (action_)
+                action_(blackboard);
+        }
+        int getPriority() const { return priority_; }
+
       private:
         StatePtr from_;
         StatePtr to_;
         Condition condition_;
         TransitionResult result_;
+        int priority_ = 0; // FIX: Add priority for transition ordering
+        Action action_;    // FIX: Add transition actions
     };
 
     using TransitionPtr = std::shared_ptr<Transition>;

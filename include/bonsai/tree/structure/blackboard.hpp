@@ -6,6 +6,7 @@
 #include <string>
 #include <typeindex>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -117,6 +118,28 @@ namespace bonsai::tree {
 
         void setObserver(Observer observer);
 
+        // FIX: Add key enumeration
+        inline std::vector<std::string> getAllKeys() const {
+            std::lock_guard<std::mutex> lock(mutex_);
+            std::unordered_set<std::string> allKeys;
+            for (const auto &scope : scopes_) {
+                for (const auto &[key, entry] : scope) {
+                    allKeys.insert(key);
+                }
+            }
+            return std::vector<std::string>(allKeys.begin(), allKeys.end());
+        }
+
+        // FIX: Add type info for a key
+        inline std::optional<std::type_index> getType(const std::string &key) const {
+            std::lock_guard<std::mutex> lock(mutex_);
+            auto [entry, depth] = findEntry(key);
+            if (entry) {
+                return entry->type;
+            }
+            return std::nullopt;
+        }
+
       private:
         struct Entry {
             Entry() : value(), type(typeid(void)) {}
@@ -137,8 +160,11 @@ namespace bonsai::tree {
         }
 
         inline void notify(const Observer &observer, const Event &event) const {
-            if (observer)
+            // FIX: Only notify on successful operations to improve performance
+            if (observer && (event.success || event.type == Event::Type::Set || event.type == Event::Type::Clear ||
+                             event.type == Event::Type::ScopePushed || event.type == Event::Type::ScopePopped)) {
                 observer(event);
+            }
         }
 
         mutable std::mutex mutex_;

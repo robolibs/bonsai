@@ -34,15 +34,24 @@ namespace bonsai::state {
         tree::Blackboard &blackboard() { return blackboard_; }
         const tree::Blackboard &blackboard() const { return blackboard_; }
 
+        // FIX: Add state history
+        const std::vector<std::string> &getStateHistory() const { return stateHistory_; }
+        void clearHistory() { stateHistory_.clear(); }
+        StatePtr getPreviousState() const { return previousState_; }
+        void transitionToPrevious();
+
       private:
         void transitionTo(const StatePtr &newState);
         std::vector<TransitionPtr> getTransitionsFrom(const StatePtr &state) const;
 
         StatePtr initialState_;
         StatePtr currentState_;
+        StatePtr previousState_; // FIX: Track previous state
         std::unordered_map<std::string, StatePtr> states_;
         std::vector<TransitionPtr> transitions_;
         tree::Blackboard blackboard_;
+        std::vector<std::string> stateHistory_;    // FIX: Track state history
+        static constexpr size_t MAX_HISTORY = 100; // Limit history size
     };
 
 } // namespace bonsai::state

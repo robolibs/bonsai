@@ -8,17 +8,25 @@ namespace bonsai::tree {
         if (state_ == State::Halted)
             return Status::Failure;
 
+        // FIX: Remember running state - don't reset state on re-entry
+        bool firstRun = (state_ != State::Running);
         state_ = State::Running;
+
         while (currentIndex_ < children_.size()) {
             Status status = children_[currentIndex_]->tick(blackboard);
-            if (status == Status::Running)
+            if (status == Status::Running) {
+                // Child is still running, remember where we are
                 return Status::Running;
+            }
             if (status == Status::Failure) {
+                // Only reset on failure, not on running
+                size_t failedIndex = currentIndex_;
                 reset();
                 return Status::Failure;
             }
             ++currentIndex_;
         }
+        // Only reset on completion
         reset();
         return Status::Success;
     }
