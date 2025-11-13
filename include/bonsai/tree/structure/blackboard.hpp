@@ -5,8 +5,8 @@
 #include <optional>
 #include <string>
 #include <typeindex>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace bonsai::tree {

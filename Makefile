@@ -23,6 +23,7 @@ $(info ------------------------------------------)
 
 
 build:
+	@find ./src ./include -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | xargs clang-format -i
 	@if [ ! -d "$(BUILD_DIR)" ]; then \
 		echo "Build directory doesn't exist, running config first..."; \
 		$(MAKE) reconfig; \

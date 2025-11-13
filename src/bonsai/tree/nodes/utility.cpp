@@ -1,5 +1,6 @@
 #include "bonsai/tree/nodes/utility.hpp"
-#include <cstdlib>
+#include <limits>
+#include <random>
 
 namespace bonsai::tree {
 
@@ -19,8 +20,8 @@ namespace bonsai::tree {
 
         state_ = State::Running;
 
-        // Calculate utilities for all children
-        float maxUtility = -1.0f;
+        // FIX: Handle negative utilities properly
+        float maxUtility = std::numeric_limits<float>::lowest();
         size_t bestIndex = 0;
 
         for (size_t i = 0; i < children_.size(); ++i) {
@@ -103,8 +104,11 @@ namespace bonsai::tree {
             return Status::Failure;
         }
 
-        // Select random child based on weights
-        float random = static_cast<float>(rand()) / RAND_MAX * totalWeight;
+        // FIX: Use thread-safe random number generation
+        static thread_local std::random_device rd;
+        static thread_local std::mt19937 gen(rd());
+        std::uniform_real_distribution<float> dis(0.0f, totalWeight);
+        float random = dis(gen);
         float accumulator = 0.0f;
 
         for (size_t i = 0; i < children_.size(); ++i) {

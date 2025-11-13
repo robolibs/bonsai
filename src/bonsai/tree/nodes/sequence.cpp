@@ -25,10 +25,15 @@ namespace bonsai::tree {
 
     void Sequence::reset() {
         Node::reset();
-        currentIndex_ = 0;
-        for (auto &child : children_) {
-            child->reset();
+        // FIX: Only reset children that were actually executed
+        for (size_t i = 0; i < currentIndex_ && i < children_.size(); ++i) {
+            children_[i]->reset();
         }
+        // Reset the current running child if any
+        if (currentIndex_ < children_.size()) {
+            children_[currentIndex_]->reset();
+        }
+        currentIndex_ = 0;
     }
 
     void Sequence::halt() {

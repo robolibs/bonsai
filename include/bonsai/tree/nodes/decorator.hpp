@@ -42,110 +42,134 @@ namespace bonsai::tree {
         }
 
         inline std::function<Status(Status)> Repeat(int maxTimes = -1) {
-            // Use struct to avoid shared_ptr cycle and ensure proper cleanup
-            struct RepeatState {
-                int attempts = 0;
-                int maxTimes;
-                RepeatState(int max) : maxTimes(max) {}
-            };
-            auto state = std::make_unique<RepeatState>(maxTimes);
-            auto statePtr = state.get();
+            // FIX: Use class to avoid shared_ptr memory leak
+            class RepeatState {
+                mutable int attempts_ = 0;
+                int maxTimes_;
 
-            return [statePtr](Status status) mutable -> Status {
-                if (status == Status::Running) {
-                    return Status::Running;
-                }
-
-                if (status == Status::Failure) {
-                    *attempts = 0; // Reset on failure
-                    return Status::Failure;
-                }
-
-                // On success, repeat if we have attempts left
-                if (status == Status::Success) {
-                    (*attempts)++;
-                    if (maxTimes > 0 && *attempts >= maxTimes) {
-                        *attempts = 0;          // Reset for next use
-                        return Status::Success; // Done repeating
+              public:
+                explicit RepeatState(int max) : maxTimes_(max) {}
+                Status operator()(Status status) const {
+                    if (status == Status::Running) {
+                        return Status::Running;
                     }
-                    return Status::Running; // Repeat again
-                }
 
-                return status;
+                    if (status == Status::Failure) {
+                        attempts_ = 0; // Reset on failure
+                        return Status::Failure;
+                    }
+
+                    // On success, repeat if we have attempts left
+                    if (status == Status::Success) {
+                        attempts_++;
+                        if (maxTimes_ > 0 && attempts_ >= maxTimes_) {
+                            attempts_ = 0;          // Reset for next use
+                            return Status::Success; // Done repeating
+                        }
+                        return Status::Running; // Repeat again
+                    }
+
+                    return status;
+                }
             };
+            return RepeatState(maxTimes);
         }
 
         inline std::function<Status(Status)> Retry(int maxTimes = -1) {
-            auto attempts = std::make_shared<int>(0);
-            return [maxTimes, attempts](Status status) mutable -> Status {
-                if (status == Status::Running) {
-                    return Status::Running;
-                }
+            // FIX: Use class to avoid shared_ptr memory leak
+            class RetryState {
+                mutable int attempts_ = 0;
+                int maxTimes_;
 
-                if (status == Status::Success) {
-                    *attempts = 0; // Reset on success
-                    return Status::Success;
-                }
-
-                // On failure, try again if we have attempts left
-                if (status == Status::Failure) {
-                    (*attempts)++;
-                    if (maxTimes > 0 && *attempts >= maxTimes) {
-                        *attempts = 0; // Reset for next use
-                        return Status::Failure;
+              public:
+                explicit RetryState(int max) : maxTimes_(max) {}
+                Status operator()(Status status) const {
+                    if (status == Status::Running) {
+                        return Status::Running;
                     }
-                    return Status::Running; // Try again
-                }
 
-                return status;
+                    if (status == Status::Success) {
+                        attempts_ = 0; // Reset on success
+                        return Status::Success;
+                    }
+
+                    // On failure, try again if we have attempts left
+                    if (status == Status::Failure) {
+                        attempts_++;
+                        if (maxTimes_ > 0 && attempts_ >= maxTimes_) {
+                            attempts_ = 0; // Reset for next use
+                            return Status::Failure;
+                        }
+                        return Status::Running; // Try again
+                    }
+
+                    return status;
+                }
             };
+            return RetryState(maxTimes);
         }
 
         inline std::function<Status(Status)> Timeout(float seconds) {
-            auto startTime = std::make_shared<std::chrono::steady_clock::time_point>();
-            return [seconds, startTime](Status status) mutable -> Status {
-                auto now = std::chrono::steady_clock::now();
+            // FIX: Use class to avoid shared_ptr memory leak
+            class TimeoutState {
+                mutable std::chrono::steady_clock::time_point startTime_;
+                float seconds_;
 
-                if (*startTime == std::chrono::steady_clock::time_point{}) {
-                    *startTime = now; // Initialize start time
+              public:
+                explicit TimeoutState(float secs) : seconds_(secs) {}
+                Status operator()(Status status) const {
+                    auto now = std::chrono::steady_clock::now();
+
+                    if (startTime_ == std::chrono::steady_clock::time_point{}) {
+                        startTime_ = now; // Initialize start time
+                    }
+
+                    auto elapsed =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime_).count() / 1000.0f;
+
+                    if (elapsed >= seconds_) {
+                        startTime_ = {};        // Reset for next use
+                        return Status::Failure; // Timeout reached
+                    }
+
+                    if (status != Status::Running) {
+                        startTime_ = {}; // Reset on completion
+                    }
+
+                    return status;
                 }
-
-                auto elapsed =
-                    std::chrono::duration_cast<std::chrono::milliseconds>(now - *startTime).count() / 1000.0f;
-
-                if (elapsed >= seconds) {
-                    *startTime = {};        // Reset for next use
-                    return Status::Failure; // Timeout reached
-                }
-
-                if (status != Status::Running) {
-                    *startTime = {}; // Reset on completion
-                }
-
-                return status;
             };
+            return TimeoutState(seconds);
         }
 
         inline std::function<Status(Status)> Cooldown(float seconds) {
-            auto lastSuccess = std::make_shared<std::chrono::steady_clock::time_point>();
-            return [seconds, lastSuccess](Status status) mutable -> Status {
-                auto now = std::chrono::steady_clock::now();
+            // FIX: Use class to avoid shared_ptr memory leak
+            class CooldownState {
+                mutable std::chrono::steady_clock::time_point lastSuccess_;
+                float seconds_;
 
-                if (status == Status::Success) {
-                    *lastSuccess = now;
-                    return Status::Success;
-                }
+              public:
+                explicit CooldownState(float secs) : seconds_(secs) {}
+                Status operator()(Status status) const {
+                    auto now = std::chrono::steady_clock::now();
 
-                if (*lastSuccess != std::chrono::steady_clock::time_point{}) {
-                    auto elapsed =
-                        std::chrono::duration_cast<std::chrono::milliseconds>(now - *lastSuccess).count() / 1000.0f;
-                    if (elapsed < seconds) {
-                        return Status::Failure; // Still in cooldown
+                    if (status == Status::Success) {
+                        lastSuccess_ = now;
+                        return Status::Success;
                     }
-                }
 
-                return status;
+                    if (lastSuccess_ != std::chrono::steady_clock::time_point{}) {
+                        auto elapsed =
+                            std::chrono::duration_cast<std::chrono::milliseconds>(now - lastSuccess_).count() / 1000.0f;
+                        if (elapsed < seconds_) {
+                            return Status::Failure; // Still in cooldown
+                        }
+                    }
+
+                    return status;
+                }
             };
+            return CooldownState(seconds);
         }
     } // namespace decorators
 

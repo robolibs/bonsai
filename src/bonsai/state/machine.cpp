@@ -93,7 +93,7 @@ namespace bonsai::state {
             return;
         }
 
-        // Check guard condition - if false, don't transition
+        // FIX: Check guard condition BEFORE exiting current state
         if (!newState->onGuard(blackboard_)) {
             return;
         }
