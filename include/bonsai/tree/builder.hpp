@@ -71,6 +71,9 @@ namespace bonsai::tree {
         int pendingRepeat_ = kNoPendingModifier; // -2 means no repeat pending, -1 means infinite repeat
         int pendingRetry_ = kNoPendingModifier;  // -2 means no retry pending, -1 means infinite retry
 
+        // Pending structural decorator nodes
+        std::optional<MemoryNode::MemoryPolicy> pendingMemoryPolicy_ = std::nullopt;
+
         // For switch node building
         std::shared_ptr<SwitchNode> currentSwitch_ = nullptr;
 

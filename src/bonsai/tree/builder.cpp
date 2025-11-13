@@ -244,11 +244,8 @@ namespace bonsai::tree {
     }
 
     Builder &Builder::memory(MemoryNode::MemoryPolicy policy) {
-        decorators_.emplace_back([](Status status) {
-            // This is a placeholder - the actual memory node needs special handling
-            // The policy parameter would be used when properly integrating with MemoryNode
-            return status;
-        });
+        // Queue a MemoryNode to wrap the next created node
+        pendingMemoryPolicy_ = policy;
         return *this;
     }
 
@@ -302,6 +299,10 @@ namespace bonsai::tree {
             node = std::make_shared<Decorator>(decorators_.back(), node);
             decorators_.pop_back();
         }
+        if (pendingMemoryPolicy_) {
+            node = std::make_shared<MemoryNode>(node, *pendingMemoryPolicy_);
+            pendingMemoryPolicy_.reset();
+        }
         return node;
     }
 
@@ -309,6 +310,10 @@ namespace bonsai::tree {
         if (!decorators_.empty()) {
             throw std::runtime_error(std::string("Cannot ") + context +
                                      ": pending decorators must wrap a node before closing");
+        }
+        if (pendingMemoryPolicy_.has_value()) {
+            throw std::runtime_error(std::string("Cannot ") + context +
+                                     ": pending memory() must wrap a node before closing");
         }
     }
 

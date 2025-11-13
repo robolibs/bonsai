@@ -111,6 +111,61 @@ class BuilderDemo {
         }
     }
 
+    void runMemoryDemo() {
+        std::cout << "\n\n🧠 Memory Decorator Demo\n" << std::endl;
+
+        // Example 1: REMEMBER_FINISHED caches Failure or Success and skips re-execution
+        int callsFinished = 0;
+        bool failOnce = true;
+        auto treeFinished = Builder()
+                                .memory(MemoryNode::MemoryPolicy::REMEMBER_FINISHED)
+                                .action([&](Blackboard &) {
+                                    std::cout << "  [Finished] Executing action (calls=" << ++callsFinished << ") -> ";
+                                    if (failOnce) {
+                                        std::cout << "FAILURE" << std::endl;
+                                        failOnce = false;
+                                        return Status::Failure; // Remembered immediately
+                                    }
+                                    std::cout << "SUCCESS" << std::endl;
+                                    return Status::Success;
+                                })
+                                .build();
+
+        std::cout << "Executing REMEMBER_FINISHED tree over 3 ticks:" << std::endl;
+        for (int i = 1; i <= 3; ++i) {
+            Status s = treeFinished.tick();
+            std::cout << "    Tick " << i << ": status="
+                      << (s == Status::Success ? "SUCCESS" : (s == Status::Failure ? "FAILURE" : "RUNNING"))
+                      << ", calls=" << callsFinished << std::endl;
+        }
+
+        std::cout << "Resetting tree clears memory" << std::endl;
+        treeFinished.reset();
+        Status s = treeFinished.tick();
+        std::cout << "    After reset: status="
+                  << (s == Status::Success ? "SUCCESS" : (s == Status::Failure ? "FAILURE" : "RUNNING"))
+                  << ", calls=" << callsFinished << std::endl;
+
+        // Example 2: REMEMBER_SUCCESSFUL caches only successes
+        int callsSuccess = 0;
+        auto treeSuccess = Builder()
+                               .memory(MemoryNode::MemoryPolicy::REMEMBER_SUCCESSFUL)
+                               .action([&](Blackboard &) {
+                                   std::cout << "  [Successful] Executing action (calls=" << ++callsSuccess
+                                             << ") -> SUCCESS" << std::endl;
+                                   return Status::Success; // After first success, subsequent ticks are cached
+                               })
+                               .build();
+
+        std::cout << "\nExecuting REMEMBER_SUCCESSFUL tree over 3 ticks:" << std::endl;
+        for (int i = 1; i <= 3; ++i) {
+            Status s2 = treeSuccess.tick();
+            std::cout << "    Tick " << i << ": status="
+                      << (s2 == Status::Success ? "SUCCESS" : (s2 == Status::Failure ? "FAILURE" : "RUNNING"))
+                      << ", calls=" << callsSuccess << std::endl;
+        }
+    }
+
     void runComplexBuilder() {
         std::cout << "\n\n🏛️ Complex Nested Builder Demo\n" << std::endl;
 
@@ -167,6 +222,7 @@ int main() {
     demo.runBasicBuilder();
     demo.runDecoratorDemo();
     demo.runParallelDemo();
+    demo.runMemoryDemo();
     demo.runComplexBuilder();
 
     std::cout << "\n🎯 All builder demos completed!" << std::endl;
