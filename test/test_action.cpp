@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <bonsai/bonsai.hpp>
+#include <coroutine>
 #include <doctest/doctest.h>
 
 using namespace bonsai::tree;
@@ -142,4 +143,61 @@ TEST_CASE("Action node halt functionality") {
 
     CHECK(counting_action.tick(bb) == Status::Success);
     CHECK(execution_count == 2);
+}
+
+TEST_CASE("Action coroutine task progresses and completes") {
+    Blackboard bb;
+
+    auto coroutine_action = Action(Action::TaskFunc([](Blackboard &) -> bonsai::core::task<Status> {
+        co_await std::suspend_always{}; // first tick -> Running
+        co_await std::suspend_always{}; // second tick -> Running
+        co_return Status::Success;      // third tick -> Success
+    }));
+
+    CHECK(coroutine_action.tick(bb) == Status::Running);
+    CHECK(coroutine_action.tick(bb) == Status::Running);
+    CHECK(coroutine_action.tick(bb) == Status::Success);
+}
+
+TEST_CASE("Action coroutine reset and halt behavior") {
+    Blackboard bb;
+
+    auto coroutine_action = Action(Action::TaskFunc([](Blackboard &) -> bonsai::core::task<Status> {
+        co_await std::suspend_always{};
+        co_await std::suspend_always{};
+        co_return Status::Success;
+    }));
+
+    CHECK(coroutine_action.tick(bb) == Status::Running);
+
+    // Halting should clear coroutine state and make next tick fail until reset
+    coroutine_action.halt();
+    CHECK(coroutine_action.isHalted());
+    CHECK(coroutine_action.tick(bb) == Status::Failure);
+
+    // Reset should allow starting over from the beginning
+    coroutine_action.reset();
+    CHECK_FALSE(coroutine_action.isHalted());
+    CHECK(coroutine_action.tick(bb) == Status::Running);
+    CHECK(coroutine_action.tick(bb) == Status::Running);
+    CHECK(coroutine_action.tick(bb) == Status::Success);
+}
+
+TEST_CASE("Builder actionTask integrates coroutine actions") {
+    using bonsai::core::task;
+
+    auto tree = Builder()
+                    .sequence()
+                    .actionTask([](Blackboard &) -> task<Status> {
+                        co_await std::suspend_always{};
+                        co_return Status::Success;
+                    })
+                    .action([](Blackboard &) { return Status::Success; })
+                    .end()
+                    .build();
+
+    // First tick: coroutine child Running => whole sequence Running
+    CHECK(tree.tick() == Status::Running);
+    // Second tick: coroutine child succeeds, then next action succeeds => whole sequence Success
+    CHECK(tree.tick() == Status::Success);
 }
