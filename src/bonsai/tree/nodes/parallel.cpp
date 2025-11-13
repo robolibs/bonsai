@@ -1,5 +1,10 @@
 #include "bonsai/tree/nodes/parallel.hpp"
+#include "bonsai/core/executor.hpp"
+// <execution> removed: using internal ThreadPool
+#include <limits>
+#include <numeric>
 #include <stdexcept>
+#include <vector>
 
 namespace bonsai::tree {
 
@@ -32,34 +37,32 @@ namespace bonsai::tree {
         if (children_.empty())
             return Status::Success;
 
+        // Prepare indices to process all non-terminal children
+        std::vector<size_t> indices(children_.size());
+        std::iota(indices.begin(), indices.end(), 0);
+
+        // Run child ticks in parallel where available; otherwise sequential.
+        // Note: Blackboard writes are synchronized internally; parallel children may still observe each other's writes.
+        static bonsai::core::ThreadPool pool;
+        pool.bulk(
+            [&](size_t k) {
+                size_t i = indices[k];
+                auto prev = childStates_[i];
+                if (prev == Status::Success || prev == Status::Failure) {
+                    return; // Already resolved this child
+                }
+                Status status = children_[i]->tick(blackboard);
+                childStates_[i] = status;
+            },
+            indices.size());
+
+        // Aggregate results
         size_t success = 0, failure = 0;
         for (size_t i = 0; i < children_.size(); ++i) {
-            if (childStates_[i] == Status::Success || childStates_[i] == Status::Failure) {
-                if (childStates_[i] == Status::Success)
-                    ++success;
-                else
-                    ++failure;
-                continue;
-            }
-
-            Status status = children_[i]->tick(blackboard);
-            childStates_[i] = status;
-
-            if (status == Status::Success)
+            if (childStates_[i] == Status::Success)
                 ++success;
-            else if (status == Status::Failure)
+            else if (childStates_[i] == Status::Failure)
                 ++failure;
-
-            if (successSatisfied(success)) {
-                haltRunningChildren();
-                reset();
-                return Status::Success;
-            }
-            if (failureSatisfied(failure)) {
-                haltRunningChildren();
-                reset();
-                return Status::Failure;
-            }
         }
 
         if (successSatisfied(success)) {
@@ -67,7 +70,6 @@ namespace bonsai::tree {
             reset();
             return Status::Success;
         }
-
         if (failureSatisfied(failure)) {
             haltRunningChildren();
             reset();
