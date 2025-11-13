@@ -22,6 +22,8 @@ namespace bonsai::tree {
 
     Builder &Builder::parallel(Parallel::Policy successPolicy, Parallel::Policy failurePolicy) {
         auto node = std::make_shared<Parallel>(successPolicy, failurePolicy);
+        if (executor_)
+            node->setExecutor(executor_);
         auto decorated = applyPendingDecorators(node);
         add(decorated);
         stack_.emplace_back(node);
@@ -30,6 +32,8 @@ namespace bonsai::tree {
 
     Builder &Builder::parallel(size_t successThreshold, std::optional<size_t> failureThreshold) {
         auto node = std::make_shared<Parallel>(successThreshold, failureThreshold);
+        if (executor_)
+            node->setExecutor(executor_);
         auto decorated = applyPendingDecorators(node);
         add(decorated);
         stack_.emplace_back(node);
@@ -59,6 +63,27 @@ namespace bonsai::tree {
         node = applyPendingDecorators(node);
 
         add(node);
+        return *this;
+    }
+
+    Builder &Builder::actionTask(Action::TaskFunc func) {
+        NodePtr node = std::make_shared<Action>(std::move(func));
+
+        if (pendingRepeat_ != kNoPendingModifier) {
+            node = std::make_shared<RepeatDecorator>(pendingRepeat_, node);
+            pendingRepeat_ = kNoPendingModifier;
+        }
+        if (pendingRetry_ != kNoPendingModifier) {
+            node = std::make_shared<RetryDecorator>(pendingRetry_, node);
+            pendingRetry_ = kNoPendingModifier;
+        }
+        node = applyPendingDecorators(node);
+        add(node);
+        return *this;
+    }
+
+    Builder &Builder::executor(bonsai::core::ThreadPool *pool) {
+        executor_ = pool;
         return *this;
     }
 

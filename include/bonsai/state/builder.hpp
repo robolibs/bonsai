@@ -182,6 +182,7 @@ namespace bonsai::state {
         std::string initialStateName_;
         std::unordered_map<std::string, StatePtr> states_;
         std::vector<PendingTransition> pendingTransitions_;
+        bonsai::core::ThreadPool *executor_ = nullptr;
     };
 
 } // namespace bonsai::state

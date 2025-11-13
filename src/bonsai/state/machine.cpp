@@ -76,7 +76,7 @@ namespace bonsai::state {
         if (indices.empty()) {
             return;
         }
-        std::vector<bool> results(possibleTransitions.size(), false);
+        std::vector<char> results(possibleTransitions.size(), 0);
 
         // Determine max priority to allow correct early-stop when found
         int maxPriority = std::numeric_limits<int>::min();
@@ -93,7 +93,7 @@ namespace bonsai::state {
                     return true;
                 size_t idx = indices[k];
                 bool ok = possibleTransitions[idx]->shouldTransition(blackboard_);
-                results[idx] = ok;
+                results[idx] = ok ? 1 : 0;
                 if (ok && possibleTransitions[idx]->getPriority() == maxPriority) {
                     // Found the best possible transition; safe to stop further work
                     return false; // signal stop
