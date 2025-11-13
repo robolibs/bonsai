@@ -13,6 +13,13 @@
 #include <unordered_map>
 #include <vector>
 
+// Forward declare ThreadPool to avoid heavy include
+namespace bonsai {
+    namespace core {
+        class ThreadPool;
+    }
+} // namespace bonsai
+
 namespace bonsai::tree {
 
     class Builder {

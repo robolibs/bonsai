@@ -85,7 +85,7 @@ TEST_CASE("Blackboard thread safety") {
 
     // Create threads that concurrently set values
     for (int i = 0; i < num_threads; ++i) {
-        threads.emplace_back([&bb, i, operations_per_thread]() {
+        threads.emplace_back([&bb, i]() {
             for (int j = 0; j < operations_per_thread; ++j) {
                 std::string key = "thread_" + std::to_string(i) + "_key_" + std::to_string(j);
                 int value = i * 1000 + j;

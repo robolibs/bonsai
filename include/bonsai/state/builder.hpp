@@ -128,6 +128,12 @@ namespace bonsai::state {
             return *this;
         }
 
+        // Optional: set executor used by StateMachine during build
+        Builder &executor(bonsai::core::ThreadPool *pool) {
+            executor_ = pool;
+            return *this;
+        }
+
         // Build the state machine
         std::unique_ptr<StateMachine> build() {
             if (initialStateName_.empty()) {
@@ -153,6 +159,11 @@ namespace bonsai::state {
                     auto transition = std::make_shared<Transition>(states_[trans.from], trans.result);
                     machine->addTransition(transition);
                 }
+            }
+
+            // Propagate executor if provided
+            if (executor_) {
+                machine->setExecutor(executor_);
             }
 
             return machine;
