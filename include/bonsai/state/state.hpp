@@ -2,6 +2,7 @@
 
 // Core structures
 #include "structure/cbstate.hpp"
+#include "structure/composite_state.hpp"
 #include "structure/state.hpp"
 #include "structure/transition.hpp"
 

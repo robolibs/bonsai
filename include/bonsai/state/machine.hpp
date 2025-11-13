@@ -8,7 +8,11 @@
 
 namespace bonsai::state {
 
+    // Forward declaration for friend class
+    class CompositeState;
+
     class StateMachine {
+        friend class CompositeState; // Allow CompositeState to access private members
       public:
         StateMachine() = default;
         explicit StateMachine(StatePtr initialState);

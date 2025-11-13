@@ -1,7 +1,9 @@
 #pragma once
 #include "machine.hpp"
+#include "structure/composite_state.hpp"
 #include "structure/state.hpp"
 #include "structure/transition.hpp"
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -71,6 +73,49 @@ namespace bonsai::state {
         Builder &cannotHappen() {
             ensureCurrentState("cannotHappen");
             pendingTransitions_.push_back(PendingTransition(currentStateName_, TransitionResult::CANNOT_HAPPEN));
+            return *this;
+        }
+
+        // Create a composite (hierarchical) state
+        Builder &compositeState(const std::string &name,
+                                CompositeState::HistoryType historyType = CompositeState::HistoryType::None,
+                                std::function<void(Builder &)> nestedStates = nullptr) {
+            currentStateName_ = name;
+
+            // Create composite state
+            auto composite = std::make_shared<CompositeState>(name, historyType);
+            states_[name] = composite;
+
+            // Build nested state machine if provided
+            if (nestedStates) {
+                Builder nestedBuilder;
+                nestedStates(nestedBuilder);
+                auto nestedMachine = nestedBuilder.build();
+                composite->setNestedMachine(std::move(nestedMachine));
+            }
+
+            return *this;
+        }
+
+        // Add entry point to current composite state
+        Builder &entryPoint(const std::string &name, const std::string &targetState) {
+            ensureCurrentState("entryPoint");
+            if (auto composite = std::dynamic_pointer_cast<CompositeState>(states_[currentStateName_])) {
+                composite->addEntryPoint(name, targetState);
+            } else {
+                throw std::runtime_error("entryPoint can only be added to composite states");
+            }
+            return *this;
+        }
+
+        // Add exit point to current composite state
+        Builder &exitPoint(const std::string &name) {
+            ensureCurrentState("exitPoint");
+            if (auto composite = std::dynamic_pointer_cast<CompositeState>(states_[currentStateName_])) {
+                composite->addExitPoint(name);
+            } else {
+                throw std::runtime_error("exitPoint can only be added to composite states");
+            }
             return *this;
         }
 
