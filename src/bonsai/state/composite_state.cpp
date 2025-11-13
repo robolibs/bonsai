@@ -35,6 +35,14 @@ namespace bonsai::state {
                 nestedMachine_->tick(); // Initialize
             }
         }
+
+        // Initialize regions
+        for (auto &region : regions_) {
+            if (region.machine) {
+                region.machine->reset();
+                region.machine->tick();
+            }
+        }
     }
 
     void CompositeState::onUpdate(tree::Blackboard &blackboard) {
@@ -44,6 +52,13 @@ namespace bonsai::state {
         // Update nested state machine
         if (nestedMachine_) {
             nestedMachine_->tick();
+        }
+
+        // Update all regions independently
+        for (auto &region : regions_) {
+            if (region.machine) {
+                region.machine->tick();
+            }
         }
     }
 
@@ -58,12 +73,40 @@ namespace bonsai::state {
             nestedMachine_->getCurrentState()->onExit(blackboard);
         }
 
+        // Exit regions' current states
+        for (auto &region : regions_) {
+            if (region.machine && region.machine->getCurrentState()) {
+                region.machine->getCurrentState()->onExit(blackboard);
+            }
+        }
+
         // Call parent onExit
         State::onExit(blackboard);
     }
 
     void CompositeState::setNestedMachine(std::unique_ptr<StateMachine> machine) {
         nestedMachine_ = std::move(machine);
+    }
+
+    void CompositeState::addRegion(const std::string &name, std::unique_ptr<StateMachine> machine) {
+        regions_.push_back(Region{name, std::move(machine)});
+    }
+
+    std::vector<std::string> CompositeState::getRegionNames() const {
+        std::vector<std::string> names;
+        names.reserve(regions_.size());
+        for (const auto &r : regions_)
+            names.push_back(r.name);
+        return names;
+    }
+
+    std::string CompositeState::getRegionCurrentState(const std::string &name) const {
+        for (const auto &r : regions_) {
+            if (r.name == name) {
+                return r.machine ? r.machine->getCurrentStateName() : std::string();
+            }
+        }
+        return std::string();
     }
 
     void CompositeState::clearHistory() {

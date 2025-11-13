@@ -119,6 +119,20 @@ namespace bonsai::state {
             return *this;
         }
 
+        // Add an orthogonal region to the current composite state
+        Builder &region(const std::string &name, std::function<void(Builder &)> buildRegion) {
+            ensureCurrentState("region");
+            auto composite = std::dynamic_pointer_cast<CompositeState>(states_[currentStateName_]);
+            if (!composite) {
+                throw std::runtime_error("region can only be added to composite states");
+            }
+            Builder regionBuilder;
+            buildRegion(regionBuilder);
+            auto regionMachine = regionBuilder.build();
+            composite->addRegion(name, std::move(regionMachine));
+            return *this;
+        }
+
         // Set the initial state
         Builder &initial(const std::string &stateName) {
             initialStateName_ = stateName;
