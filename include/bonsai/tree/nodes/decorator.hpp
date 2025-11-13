@@ -42,8 +42,16 @@ namespace bonsai::tree {
         }
 
         inline std::function<Status(Status)> Repeat(int maxTimes = -1) {
-            auto attempts = std::make_shared<int>(0);
-            return [maxTimes, attempts](Status status) mutable -> Status {
+            // Use struct to avoid shared_ptr cycle and ensure proper cleanup
+            struct RepeatState {
+                int attempts = 0;
+                int maxTimes;
+                RepeatState(int max) : maxTimes(max) {}
+            };
+            auto state = std::make_unique<RepeatState>(maxTimes);
+            auto statePtr = state.get();
+
+            return [statePtr](Status status) mutable -> Status {
                 if (status == Status::Running) {
                     return Status::Running;
                 }
