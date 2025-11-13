@@ -1,4 +1,5 @@
 #include "bonsai/tree/builder.hpp"
+#include "bonsai/tree/nodes/control_flow.hpp"
 #include <string>
 
 namespace bonsai::tree {
@@ -104,6 +105,132 @@ namespace bonsai::tree {
         return *this;
     }
 
+    // Control flow nodes implementation
+    Builder &Builder::condition(std::function<bool(Blackboard &)> cond, std::function<void(Builder &)> thenBranch,
+                                std::function<void(Builder &)> elseBranch) {
+        // Build then branch
+        Builder thenBuilder;
+        if (thenBranch) {
+            thenBranch(thenBuilder);
+        }
+        NodePtr thenNode = thenBuilder.root_;
+
+        // Build else branch if provided
+        NodePtr elseNode = nullptr;
+        if (elseBranch) {
+            Builder elseBuilder;
+            elseBranch(elseBuilder);
+            elseNode = elseBuilder.root_;
+        }
+
+        auto node = std::make_shared<ConditionalNode>(std::move(cond), thenNode, elseNode);
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        return *this;
+    }
+
+    Builder &Builder::whileLoop(std::function<bool(Blackboard &)> condition, std::function<void(Builder &)> body,
+                                int maxIterations) {
+        // Build loop body
+        Builder bodyBuilder;
+        if (body) {
+            body(bodyBuilder);
+        }
+        NodePtr bodyNode = bodyBuilder.root_;
+
+        auto node = std::make_shared<WhileNode>(std::move(condition), bodyNode, maxIterations);
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        return *this;
+    }
+
+    Builder &Builder::forLoop(int count, std::function<void(Builder &)> body) {
+        // Build loop body
+        Builder bodyBuilder;
+        if (body) {
+            body(bodyBuilder);
+        }
+        NodePtr bodyNode = bodyBuilder.root_;
+
+        auto node = std::make_shared<ForNode>(bodyNode, count);
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        return *this;
+    }
+
+    Builder &Builder::forLoop(std::function<int(Blackboard &)> countFunc, std::function<void(Builder &)> body) {
+        // Build loop body
+        Builder bodyBuilder;
+        if (body) {
+            body(bodyBuilder);
+        }
+        NodePtr bodyNode = bodyBuilder.root_;
+
+        auto node = std::make_shared<ForNode>(bodyNode, std::move(countFunc));
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        return *this;
+    }
+
+    Builder &Builder::switchNode(std::function<std::string(Blackboard &)> selector) {
+        currentSwitch_ = std::make_shared<SwitchNode>(std::move(selector));
+        return *this;
+    }
+
+    Builder &Builder::addCase(const std::string &caseValue, std::function<void(Builder &)> body) {
+        if (!currentSwitch_) {
+            throw std::runtime_error("addCase() must be called after switchNode()");
+        }
+
+        // Build case body
+        Builder caseBuilder;
+        if (body) {
+            body(caseBuilder);
+        }
+        NodePtr caseNode = caseBuilder.root_;
+
+        currentSwitch_->addCase(caseValue, caseNode);
+        return *this;
+    }
+
+    Builder &Builder::defaultCase(std::function<void(Builder &)> body) {
+        if (!currentSwitch_) {
+            throw std::runtime_error("defaultCase() must be called after switchNode()");
+        }
+
+        // Build default case body
+        Builder defaultBuilder;
+        if (body) {
+            body(defaultBuilder);
+        }
+        NodePtr defaultNode = defaultBuilder.root_;
+
+        currentSwitch_->setDefault(defaultNode);
+
+        // Add the complete switch node to the tree
+        auto decorated = applyPendingDecorators(currentSwitch_);
+        add(decorated);
+        currentSwitch_ = nullptr; // Reset for next switch
+        return *this;
+    }
+
+    Builder &Builder::memory(MemoryNode::MemoryPolicy policy) {
+        decorators_.emplace_back([](Status status) {
+            // This is a placeholder - the actual memory node needs special handling
+            // The policy parameter would be used when properly integrating with MemoryNode
+            return status;
+        });
+        return *this;
+    }
+
+    Builder &Builder::conditionalSequence() {
+        auto node = std::make_shared<ConditionalSequence>();
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        stack_.emplace_back(node);
+        return *this;
+    }
+
     void Builder::add(const NodePtr &node) {
         if (stack_.empty()) {
             root_ = node;
@@ -117,6 +244,8 @@ namespace bonsai::tree {
                 sel->addChild(node);
             } else if (auto par = std::dynamic_pointer_cast<Parallel>(parent)) {
                 par->addChild(node);
+            } else if (auto condSeq = std::dynamic_pointer_cast<ConditionalSequence>(parent)) {
+                condSeq->addChild(node);
             }
         }
     }
@@ -138,12 +267,10 @@ namespace bonsai::tree {
 
     void Builder::ensureNoPendingLeafModifiers(const char *context) const {
         if (pendingRepeat_ != kNoPendingModifier) {
-            throw std::runtime_error(std::string("Cannot ") + context +
-                                     ": pending repeat() must wrap an action");
+            throw std::runtime_error(std::string("Cannot ") + context + ": pending repeat() must wrap an action");
         }
         if (pendingRetry_ != kNoPendingModifier) {
-            throw std::runtime_error(std::string("Cannot ") + context +
-                                     ": pending retry() must wrap an action");
+            throw std::runtime_error(std::string("Cannot ") + context + ": pending retry() must wrap an action");
         }
     }
 

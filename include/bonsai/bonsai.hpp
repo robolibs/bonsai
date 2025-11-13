@@ -7,6 +7,7 @@
 
 // Node types
 #include "tree/nodes/action.hpp"
+#include "tree/nodes/control_flow.hpp"
 #include "tree/nodes/decorator.hpp"
 #include "tree/nodes/parallel.hpp"
 #include "tree/nodes/selector.hpp"
