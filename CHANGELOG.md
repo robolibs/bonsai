@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.3.0] - 2025-11-13
+
+### <!-- 0 -->⛰️  Features
+
+- Add orthogonal regions support to composite states
+- Implement memory node policies and builder integration
+- Introduce parallel coroutine execution with early stopping
+- Add coroutine task support to bonsai tree nodes
+- Introduce pluggable thread pools with early-stop optimizations
+- Introduce asynchronous task execution and parallel processing
+- Implement hierarchical state machines
+- Refactor state machine and blackboard for enhanced functionality
+- Introduce new control flow nodes and update builder
+- Add guard conditions and transition controls
+- Implement state machine system
+- Add scoped blackboard variables and observer
+- Add parallel node thresholds for nuanced control
+- Improve behavior tree node state management
+- Improve decorator and parallel node behavior
+- Separate inline definitions into cpp files
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Refactor core behavior tree logic for improved robustness
+- Moves everything under bonsai::tree
+
+### <!-- 2 -->🚜 Refactor
+
+- Clean up and improve `StateMachine` and `Builder`
+- Refactor `Repeat` to use a struct for managing state
+
+### <!-- 3 -->📚 Documentation
+
+- Remove critical fixes documentation
+- Update documentation and enhance core library features
+- Update README with state machine and examples
+
 ## [0.2.0] - 2025-06-11
 
 ### <!-- 0 -->⛰️  Features
