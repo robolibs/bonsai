@@ -56,6 +56,11 @@ namespace bonsai::tree {
         Builder &memory(MemoryNode::MemoryPolicy policy = MemoryNode::MemoryPolicy::REMEMBER_FINISHED);
         Builder &conditionalSequence();
 
+        // New reactive and dynamic nodes
+        Builder &reactiveSequence();
+        Builder &dynamicSelector();
+        Builder &subtree(NodePtr subtreeRoot);
+
       private:
         void add(const NodePtr &node);
         NodePtr applyPendingDecorators(NodePtr node);

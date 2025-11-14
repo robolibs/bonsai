@@ -257,6 +257,29 @@ namespace bonsai::tree {
         return *this;
     }
 
+    Builder &Builder::reactiveSequence() {
+        auto node = std::make_shared<ReactiveSequence>();
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        stack_.emplace_back(node);
+        return *this;
+    }
+
+    Builder &Builder::dynamicSelector() {
+        auto node = std::make_shared<DynamicSelector>();
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        stack_.emplace_back(node);
+        return *this;
+    }
+
+    Builder &Builder::subtree(NodePtr subtreeRoot) {
+        auto node = std::make_shared<SubtreeNode>(std::move(subtreeRoot));
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        return *this;
+    }
+
     void Builder::add(const NodePtr &node) {
         // FIX: Validate node before adding
         if (!node) {
@@ -285,6 +308,13 @@ namespace bonsai::tree {
                 added = true;
             } else if (auto condSeq = std::dynamic_pointer_cast<ConditionalSequence>(parent)) {
                 condSeq->addChild(node);
+                added = true;
+            } else if (auto reactiveSeq = std::dynamic_pointer_cast<ReactiveSequence>(parent)) {
+                reactiveSeq->addChild(node);
+                added = true;
+            } else if (auto dynSel = std::dynamic_pointer_cast<DynamicSelector>(parent)) {
+                // Default priority function: constant priority based on order
+                dynSel->addChild(node, [](Blackboard &) { return 0.0f; });
                 added = true;
             }
 

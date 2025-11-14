@@ -346,4 +346,177 @@ namespace bonsai::tree {
         currentIndex_ = 0;
     }
 
+    // ============================================================================
+    // ReactiveSequence Implementation
+    // ============================================================================
+
+    void ReactiveSequence::addChild(NodePtr child, ConditionFunc condition) {
+        children_.push_back({std::move(child), std::move(condition)});
+    }
+
+    Status ReactiveSequence::tick(Blackboard &blackboard) {
+        // Re-check all conditions from the beginning each tick
+        for (size_t i = 0; i < children_.size(); ++i) {
+            auto &reactiveChild = children_[i];
+
+            // Check condition if exists
+            if (reactiveChild.condition) {
+                if (!reactiveChild.condition(blackboard)) {
+                    // Condition failed - halt current child and restart from beginning
+                    if (i <= currentIndex_ && currentIndex_ < children_.size()) {
+                        children_[currentIndex_].node->halt();
+                    }
+                    currentIndex_ = 0;
+                    setState(State::Idle);
+                    return Status::Failure;
+                }
+            }
+
+            // If we've reached the currently executing child, tick it
+            if (i == currentIndex_) {
+                Status childStatus = reactiveChild.node->tick(blackboard);
+
+                if (childStatus == Status::Running) {
+                    setState(State::Running);
+                    return Status::Running;
+                }
+
+                if (childStatus == Status::Failure) {
+                    currentIndex_ = 0;
+                    setState(State::Idle);
+                    return Status::Failure;
+                }
+
+                // Child succeeded, move to next
+                currentIndex_++;
+                if (currentIndex_ >= children_.size()) {
+                    // All children succeeded
+                    currentIndex_ = 0;
+                    setState(State::Idle);
+                    return Status::Success;
+                }
+            }
+        }
+
+        // Should not reach here
+        currentIndex_ = 0;
+        return Status::Failure;
+    }
+
+    void ReactiveSequence::reset() {
+        Node::reset();
+        for (auto &child : children_) {
+            if (child.node)
+                child.node->reset();
+        }
+        currentIndex_ = 0;
+    }
+
+    void ReactiveSequence::halt() {
+        Node::halt();
+        if (currentIndex_ < children_.size()) {
+            children_[currentIndex_].node->halt();
+        }
+        currentIndex_ = 0;
+    }
+
+    // ============================================================================
+    // DynamicSelector Implementation
+    // ============================================================================
+
+    void DynamicSelector::addChild(NodePtr child, PriorityFunc priorityFunc) {
+        children_.push_back({std::move(child), std::move(priorityFunc)});
+    }
+
+    Status DynamicSelector::tick(Blackboard &blackboard) {
+        if (children_.empty()) {
+            return Status::Failure;
+        }
+
+        // Re-evaluate priorities every tick
+        size_t highestPriorityIndex = 0;
+        float highestPriority = std::numeric_limits<float>::lowest();
+
+        for (size_t i = 0; i < children_.size(); ++i) {
+            float priority = children_[i].priorityFunc(blackboard);
+            if (priority > highestPriority) {
+                highestPriority = priority;
+                highestPriorityIndex = i;
+            }
+        }
+
+        // If the highest priority child changed, halt the current one
+        if (currentIndex_ != SIZE_MAX && currentIndex_ != highestPriorityIndex) {
+            children_[currentIndex_].node->halt();
+            children_[currentIndex_].node->reset();
+        }
+
+        currentIndex_ = highestPriorityIndex;
+
+        // Execute the highest priority child
+        Status childStatus = children_[currentIndex_].node->tick(blackboard);
+
+        if (childStatus == Status::Success) {
+            currentIndex_ = SIZE_MAX;
+            setState(State::Idle);
+            return Status::Success;
+        }
+
+        if (childStatus == Status::Failure) {
+            // Current child failed, try the next highest priority
+            // For simplicity, we'll just return failure and let the next tick re-evaluate
+            currentIndex_ = SIZE_MAX;
+            setState(State::Idle);
+            return Status::Failure;
+        }
+
+        setState(State::Running);
+        return Status::Running;
+    }
+
+    void DynamicSelector::reset() {
+        Node::reset();
+        for (auto &child : children_) {
+            if (child.node)
+                child.node->reset();
+        }
+        currentIndex_ = SIZE_MAX;
+    }
+
+    void DynamicSelector::halt() {
+        Node::halt();
+        if (currentIndex_ != SIZE_MAX && currentIndex_ < children_.size()) {
+            children_[currentIndex_].node->halt();
+        }
+        currentIndex_ = SIZE_MAX;
+    }
+
+    // ============================================================================
+    // SubtreeNode Implementation
+    // ============================================================================
+
+    SubtreeNode::SubtreeNode(NodePtr subtreeRoot) : subtreeRoot_(std::move(subtreeRoot)) {}
+
+    Status SubtreeNode::tick(Blackboard &blackboard) {
+        if (!subtreeRoot_) {
+            return Status::Failure;
+        }
+
+        return subtreeRoot_->tick(blackboard);
+    }
+
+    void SubtreeNode::reset() {
+        Node::reset();
+        if (subtreeRoot_)
+            subtreeRoot_->reset();
+    }
+
+    void SubtreeNode::halt() {
+        Node::halt();
+        if (subtreeRoot_)
+            subtreeRoot_->halt();
+    }
+
+    void SubtreeNode::setSubtree(NodePtr subtreeRoot) { subtreeRoot_ = std::move(subtreeRoot); }
+
 } // namespace bonsai::tree
