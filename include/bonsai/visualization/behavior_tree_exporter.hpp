@@ -106,7 +106,9 @@ namespace bonsai::visualization {
             // This is a heuristic based on common naming conventions
             std::string typeName = getNodeTypeName(node);
             return typeName.find("Sequence") != std::string::npos || typeName.find("Selector") != std::string::npos ||
-                   typeName.find("Parallel") != std::string::npos;
+                   typeName.find("Parallel") != std::string::npos || typeName.find("Switch") != std::string::npos ||
+                   typeName.find("Conditional") != std::string::npos || typeName.find("While") != std::string::npos ||
+                   typeName.find("For") != std::string::npos;
         }
 
         static bool isDecoratorNode(const tree::NodePtr &node) {
@@ -114,7 +116,8 @@ namespace bonsai::visualization {
             std::string typeName = getNodeTypeName(node);
             return typeName.find("Decorator") != std::string::npos || typeName.find("Inverter") != std::string::npos ||
                    typeName.find("Repeat") != std::string::npos || typeName.find("Retry") != std::string::npos ||
-                   typeName.find("Timeout") != std::string::npos || typeName.find("Cooldown") != std::string::npos;
+                   typeName.find("Timeout") != std::string::npos || typeName.find("Cooldown") != std::string::npos ||
+                   typeName.find("Memory") != std::string::npos || typeName.find("Subtree") != std::string::npos;
         }
     };
 
