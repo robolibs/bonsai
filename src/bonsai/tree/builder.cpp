@@ -1,4 +1,5 @@
 #include "bonsai/tree/builder.hpp"
+#include "bonsai/tree/nodes/advanced.hpp"
 #include "bonsai/tree/nodes/control_flow.hpp"
 #include <string>
 
@@ -280,6 +281,36 @@ namespace bonsai::tree {
         return *this;
     }
 
+    Builder &Builder::randomSelector() {
+        auto node = std::make_shared<RandomSelector>();
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        stack_.emplace_back(node);
+        return *this;
+    }
+
+    Builder &Builder::probabilitySelector() {
+        auto node = std::make_shared<ProbabilitySelector>();
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        stack_.emplace_back(node);
+        return *this;
+    }
+
+    Builder &Builder::oneShotSequence() {
+        auto node = std::make_shared<OneShotSequence>();
+        auto decorated = applyPendingDecorators(node);
+        add(decorated);
+        stack_.emplace_back(node);
+        return *this;
+    }
+
+    Builder &Builder::debounce(std::chrono::milliseconds debounceTime) {
+        // Queue a DebounceDecorator to wrap the next created node
+        pendingDebounceTime_ = debounceTime;
+        return *this;
+    }
+
     void Builder::add(const NodePtr &node) {
         // FIX: Validate node before adding
         if (!node) {
@@ -316,6 +347,16 @@ namespace bonsai::tree {
                 // Default priority function: constant priority based on order
                 dynSel->addChild(node, [](Blackboard &) { return 0.0f; });
                 added = true;
+            } else if (auto randSel = std::dynamic_pointer_cast<RandomSelector>(parent)) {
+                randSel->addChild(node);
+                added = true;
+            } else if (auto probSel = std::dynamic_pointer_cast<ProbabilitySelector>(parent)) {
+                // Default probability: equal for all children
+                probSel->addChild(node, 0.5f);
+                added = true;
+            } else if (auto oneShot = std::dynamic_pointer_cast<OneShotSequence>(parent)) {
+                oneShot->addChild(node);
+                added = true;
             }
 
             if (!added) {
@@ -333,6 +374,10 @@ namespace bonsai::tree {
             node = std::make_shared<MemoryNode>(node, *pendingMemoryPolicy_);
             pendingMemoryPolicy_.reset();
         }
+        if (pendingDebounceTime_) {
+            node = std::make_shared<DebounceDecorator>(node, *pendingDebounceTime_);
+            pendingDebounceTime_.reset();
+        }
         return node;
     }
 
@@ -344,6 +389,10 @@ namespace bonsai::tree {
         if (pendingMemoryPolicy_.has_value()) {
             throw std::runtime_error(std::string("Cannot ") + context +
                                      ": pending memory() must wrap a node before closing");
+        }
+        if (pendingDebounceTime_.has_value()) {
+            throw std::runtime_error(std::string("Cannot ") + context +
+                                     ": pending debounce() must wrap a node before closing");
         }
     }
 
