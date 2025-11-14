@@ -55,6 +55,19 @@ namespace bonsai::state {
         // Update current state
         currentState_->onUpdate(blackboard_);
 
+        // Debug: state updated
+        if (debugCallback_) {
+            DebugInfo info;
+            info.event = DebugEvent::STATE_UPDATED;
+            info.fromState = currentState_->name();
+            info.toState = currentState_->name();
+            info.transitionInfo = "";
+            info.timestamp = std::chrono::steady_clock::now();
+            info.guardPassed = true;
+            info.priority = 0;
+            notifyDebug(info);
+        }
+
         // Check for transitions - evaluate conditions in parallel then pick highest priority
         auto possibleTransitions = getTransitionsFrom(currentState_);
         if (possibleTransitions.empty()) {
@@ -199,8 +212,19 @@ namespace bonsai::state {
 
         if (chosen != static_cast<size_t>(-1)) {
             auto &transition = possibleTransitions[chosen];
+
+            // Determine transition reason
+            std::string reason = "condition";
+            if (transition->isTimedTransition()) {
+                reason = "timed";
+            } else if (transition->getWeight().has_value()) {
+                reason = "weighted";
+            } else if (transition->getProbability().has_value()) {
+                reason = "probabilistic";
+            }
+
             transition->executeAction(blackboard_);
-            transitionTo(transition->to());
+            transitionTo(transition->to(), reason);
         }
     }
 
@@ -220,27 +244,96 @@ namespace bonsai::state {
         return currentState_ ? currentState_->name() : empty;
     }
 
-    void StateMachine::transitionTo(const StatePtr &newState) {
+    void StateMachine::transitionTo(const StatePtr &newState) { transitionTo(newState, "condition"); }
+
+    void StateMachine::transitionTo(const StatePtr &newState, const std::string &reason) {
         if (!newState) {
             return;
         }
 
         // FIX: Check guard condition BEFORE exiting current state
         if (!newState->onGuard(blackboard_)) {
+            // Debug: guard rejected
+            if (debugCallback_) {
+                DebugInfo info;
+                info.event = DebugEvent::TRANSITION_REJECTED;
+                info.fromState = currentState_ ? currentState_->name() : "";
+                info.toState = newState->name();
+                info.transitionInfo = reason;
+                info.timestamp = std::chrono::steady_clock::now();
+                info.guardPassed = false;
+                info.priority = 0;
+                notifyDebug(info);
+            }
             return;
         }
 
+        std::string fromStateName = currentState_ ? currentState_->name() : "";
+
         // Exit current state
         if (currentState_) {
+            // Debug: state exited
+            if (debugCallback_) {
+                DebugInfo info;
+                info.event = DebugEvent::STATE_EXITED;
+                info.fromState = currentState_->name();
+                info.toState = newState->name();
+                info.transitionInfo = reason;
+                info.timestamp = std::chrono::steady_clock::now();
+                info.guardPassed = true;
+                info.priority = 0;
+                notifyDebug(info);
+            }
+
             currentState_->onExit(blackboard_);
             previousState_ = currentState_; // FIX: Track previous state
             // Reset timers for the old state
             resetTimersForState(currentState_);
         }
 
+        // Record transition
+        if (trackTransitionHistory_) {
+            TransitionRecord record;
+            record.fromState = fromStateName;
+            record.toState = newState->name();
+            record.timestamp = std::chrono::steady_clock::now();
+            record.reason = reason;
+
+            if (transitionHistory_.size() >= MAX_TRANSITION_HISTORY) {
+                transitionHistory_.erase(transitionHistory_.begin());
+            }
+            transitionHistory_.push_back(record);
+        }
+
+        // Debug: transition taken
+        if (debugCallback_) {
+            DebugInfo info;
+            info.event = DebugEvent::TRANSITION_TAKEN;
+            info.fromState = fromStateName;
+            info.toState = newState->name();
+            info.transitionInfo = reason;
+            info.timestamp = std::chrono::steady_clock::now();
+            info.guardPassed = true;
+            info.priority = 0;
+            notifyDebug(info);
+        }
+
         // Enter new state
         currentState_ = newState;
         currentState_->onEnter(blackboard_);
+
+        // Debug: state entered
+        if (debugCallback_) {
+            DebugInfo info;
+            info.event = DebugEvent::STATE_ENTERED;
+            info.fromState = fromStateName;
+            info.toState = newState->name();
+            info.transitionInfo = reason;
+            info.timestamp = std::chrono::steady_clock::now();
+            info.guardPassed = true;
+            info.priority = 0;
+            notifyDebug(info);
+        }
 
         // Start timers for the new state
         startTimersForState(newState);
@@ -250,6 +343,12 @@ namespace bonsai::state {
             stateHistory_.erase(stateHistory_.begin());
         }
         stateHistory_.push_back(newState->name());
+    }
+
+    void StateMachine::notifyDebug(const DebugInfo &info) {
+        if (debugCallback_) {
+            debugCallback_(info);
+        }
     }
 
     void StateMachine::startTimersForState(const StatePtr &state) {
