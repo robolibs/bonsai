@@ -1,2 +1,4 @@
 build
 TODO.md
+devbox.lock
+compile_commands.json
