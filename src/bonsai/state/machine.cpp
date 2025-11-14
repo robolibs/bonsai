@@ -1,5 +1,7 @@
 #include "bonsai/state/machine.hpp"
+#include "bonsai/core/executor.hpp"
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 
 namespace bonsai::state {
@@ -52,26 +54,68 @@ namespace bonsai::state {
         // Update current state
         currentState_->onUpdate(blackboard_);
 
-        // Check for transitions - FIX: Sort by priority
+        // Check for transitions - evaluate conditions in parallel then pick highest priority
         auto possibleTransitions = getTransitionsFrom(currentState_);
-        std::sort(possibleTransitions.begin(), possibleTransitions.end(),
-                  [](const TransitionPtr &a, const TransitionPtr &b) { return a->getPriority() > b->getPriority(); });
-        for (const auto &transition : possibleTransitions) {
-            // Validate the transition first
-            if (transition->cannotHappen()) {
-                transition->validate(); // This will throw
-            }
+        if (possibleTransitions.empty()) {
+            return;
+        }
 
-            // Skip ignored events
-            if (transition->isIgnored()) {
+        // Pre-validate and filter ignored; keep indices for stable mapping
+        std::vector<size_t> indices;
+        indices.reserve(possibleTransitions.size());
+        for (size_t i = 0; i < possibleTransitions.size(); ++i) {
+            const auto &tr = possibleTransitions[i];
+            if (tr->cannotHappen()) {
+                tr->validate(); // will throw
+            }
+            if (tr->isIgnored()) {
                 continue;
             }
+            indices.push_back(i);
+        }
+        if (indices.empty()) {
+            return;
+        }
+        std::vector<char> results(possibleTransitions.size(), 0);
 
-            // Check if transition should occur
-            if (transition->shouldTransition(blackboard_)) {
-                transitionTo(transition->to());
-                break; // Take first valid transition
+        // Determine max priority to allow correct early-stop when found
+        int maxPriority = std::numeric_limits<int>::min();
+        for (size_t idx : indices) {
+            maxPriority = std::max(maxPriority, possibleTransitions[idx]->getPriority());
+        }
+
+        static bonsai::core::ThreadPool defaultPool;
+        bonsai::core::ThreadPool *pool = executor_ ? executor_ : &defaultPool;
+        std::atomic<bool> stop{false};
+        pool->bulk_early_stop(
+            [&](size_t k) -> bool {
+                if (stop.load(std::memory_order_relaxed))
+                    return true;
+                size_t idx = indices[k];
+                bool ok = possibleTransitions[idx]->shouldTransition(blackboard_);
+                results[idx] = ok ? 1 : 0;
+                if (ok && possibleTransitions[idx]->getPriority() == maxPriority) {
+                    // Found the best possible transition; safe to stop further work
+                    return false; // signal stop
+                }
+                return true;
+            },
+            indices.size(), stop);
+
+        // Pick highest priority among true transitions
+        int bestPriority = std::numeric_limits<int>::min();
+        size_t chosen = static_cast<size_t>(-1);
+        for (size_t i = 0; i < possibleTransitions.size(); ++i) {
+            if (!results[i])
+                continue;
+            int pr = possibleTransitions[i]->getPriority();
+            if (pr > bestPriority) {
+                bestPriority = pr;
+                chosen = i;
             }
+        }
+        if (chosen != static_cast<size_t>(-1)) {
+            transitionTo(possibleTransitions[chosen]->to());
         }
     }
 

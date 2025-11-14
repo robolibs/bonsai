@@ -6,6 +6,12 @@
 #include <unordered_map>
 #include <vector>
 
+namespace bonsai {
+    namespace core {
+        class ThreadPool;
+    }
+} // namespace bonsai
+
 namespace bonsai::state {
 
     // Forward declaration for friend class
@@ -44,6 +50,9 @@ namespace bonsai::state {
         StatePtr getPreviousState() const { return previousState_; }
         void transitionToPrevious();
 
+        // Optional: pluggable executor
+        void setExecutor(bonsai::core::ThreadPool *pool) { executor_ = pool; }
+
       private:
         void transitionTo(const StatePtr &newState);
         std::vector<TransitionPtr> getTransitionsFrom(const StatePtr &state) const;
@@ -56,6 +65,7 @@ namespace bonsai::state {
         tree::Blackboard blackboard_;
         std::vector<std::string> stateHistory_;    // FIX: Track state history
         static constexpr size_t MAX_HISTORY = 100; // Limit history size
+        bonsai::core::ThreadPool *executor_ = nullptr;
     };
 
 } // namespace bonsai::state

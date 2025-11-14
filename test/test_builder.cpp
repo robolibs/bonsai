@@ -97,14 +97,73 @@ TEST_CASE("Builder with decorators") {
     }
 
     SUBCASE("Decorator applies to composite nodes") {
-        auto tree = Builder()
-                        .inverter()
-                        .sequence()
-                        .action([](Blackboard &) { return Status::Success; })
-                        .end()
-                        .build();
+        auto tree = Builder().inverter().sequence().action([](Blackboard &) { return Status::Success; }).end().build();
 
         CHECK(tree.tick() == Status::Failure);
+    }
+
+    SUBCASE("Memory decorator wraps next action and remembers success") {
+        int count = 0;
+        auto tree = Builder()
+                        .memory(MemoryNode::MemoryPolicy::REMEMBER_SUCCESSFUL)
+                        .action([&](Blackboard &) {
+                            count++;
+                            return Status::Success;
+                        })
+                        .build();
+        CHECK(tree.tick() == Status::Success);
+        CHECK(count == 1);
+        CHECK(tree.tick() == Status::Success);
+        CHECK(count == 1); // not called again
+    }
+
+    SUBCASE("Memory decorator wraps next action and remembers failure") {
+        int count = 0;
+        auto tree = Builder()
+                        .memory(MemoryNode::MemoryPolicy::REMEMBER_FAILURE)
+                        .action([&](Blackboard &) {
+                            count++;
+                            return Status::Failure;
+                        })
+                        .build();
+        CHECK(tree.tick() == Status::Failure);
+        CHECK(count == 1);
+        CHECK(tree.tick() == Status::Failure);
+        CHECK(count == 1);
+    }
+
+    SUBCASE("Memory clears on reset") {
+        int count = 0;
+        auto tree = Builder()
+                        .memory(MemoryNode::MemoryPolicy::REMEMBER_FINISHED)
+                        .action([&](Blackboard &) {
+                            count++;
+                            return Status::Success;
+                        })
+                        .build();
+        CHECK(tree.tick() == Status::Success);
+        CHECK(tree.tick() == Status::Success);
+        CHECK(count == 1);
+        tree.reset();
+        CHECK(tree.tick() == Status::Success);
+        CHECK(count == 2);
+    }
+
+    SUBCASE("Memory can wrap composite when placed before it") {
+        int count = 0;
+        auto tree = Builder()
+                        .memory(MemoryNode::MemoryPolicy::REMEMBER_SUCCESSFUL)
+                        .sequence()
+                        .action([&](Blackboard &) {
+                            count++;
+                            return Status::Success;
+                        })
+                        .end()
+                        .build();
+        CHECK(tree.tick() == Status::Success);
+        CHECK(count == 1);
+        CHECK(tree.tick() == Status::Success);
+        CHECK(count == 1);
     }
 }
 
@@ -267,11 +326,12 @@ TEST_CASE("Builder error handling") {
 TEST_CASE("Tree halt resumes execution") {
     int execution_count = 0;
 
-    auto tree =
-        Builder().action([&execution_count](Blackboard &) -> Status {
-                   execution_count++;
-                   return Status::Running;
-               }).build();
+    auto tree = Builder()
+                    .action([&execution_count](Blackboard &) -> Status {
+                        execution_count++;
+                        return Status::Running;
+                    })
+                    .build();
 
     CHECK(tree.tick() == Status::Running);
     CHECK(execution_count == 1);

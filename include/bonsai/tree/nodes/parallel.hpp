@@ -3,6 +3,12 @@
 #include <optional>
 #include <vector>
 
+namespace bonsai {
+    namespace core {
+        class ThreadPool;
+    }
+} // namespace bonsai
+
 namespace bonsai::tree {
 
     class Parallel : public Node {
@@ -17,12 +23,16 @@ namespace bonsai::tree {
         void reset() override;
         void halt() override;
 
+        // Optional: pluggable executor
+        void setExecutor(bonsai::core::ThreadPool *pool) { executor_ = pool; }
+
       private:
         std::vector<NodePtr> children_;
         std::vector<Status> childStates_;
         Policy successPolicy_, failurePolicy_;
         std::optional<size_t> successThreshold_;
         std::optional<size_t> failureThreshold_;
+        bonsai::core::ThreadPool *executor_ = nullptr;
 
         void haltRunningChildren();
         bool successSatisfied(size_t successCount) const;

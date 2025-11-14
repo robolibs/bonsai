@@ -13,6 +13,13 @@
 #include <unordered_map>
 #include <vector>
 
+// Forward declare ThreadPool to avoid heavy include
+namespace bonsai {
+    namespace core {
+        class ThreadPool;
+    }
+} // namespace bonsai
+
 namespace bonsai::tree {
 
     class Builder {
@@ -23,6 +30,8 @@ namespace bonsai::tree {
         Builder &parallel(size_t successThreshold, std::optional<size_t> failureThreshold = std::nullopt);
         Builder &decorator(Decorator::Func func);
         Builder &action(Action::Func func);
+        Builder &actionTask(Action::TaskFunc func);
+        Builder &executor(bonsai::core::ThreadPool *pool);
         Builder &end();
         Tree build();
 
@@ -62,8 +71,14 @@ namespace bonsai::tree {
         int pendingRepeat_ = kNoPendingModifier; // -2 means no repeat pending, -1 means infinite repeat
         int pendingRetry_ = kNoPendingModifier;  // -2 means no retry pending, -1 means infinite retry
 
+        // Pending structural decorator nodes
+        std::optional<MemoryNode::MemoryPolicy> pendingMemoryPolicy_ = std::nullopt;
+
         // For switch node building
         std::shared_ptr<SwitchNode> currentSwitch_ = nullptr;
+
+        // Optional executor applied to parallel nodes
+        bonsai::core::ThreadPool *executor_ = nullptr;
     };
 
 } // namespace bonsai::tree

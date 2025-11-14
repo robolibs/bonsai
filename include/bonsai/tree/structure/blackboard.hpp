@@ -160,9 +160,11 @@ namespace bonsai::tree {
         }
 
         inline void notify(const Observer &observer, const Event &event) const {
-            // FIX: Only notify on successful operations to improve performance
-            if (observer && (event.success || event.type == Event::Type::Set || event.type == Event::Type::Clear ||
-                             event.type == Event::Type::ScopePushed || event.type == Event::Type::ScopePopped)) {
+            // Always notify for Get events (success or failure) to support observability expectations
+            if (!observer)
+                return;
+            if (event.type == Event::Type::Get || event.type == Event::Type::Set || event.type == Event::Type::Clear ||
+                event.type == Event::Type::ScopePushed || event.type == Event::Type::ScopePopped || event.success) {
                 observer(event);
             }
         }

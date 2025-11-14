@@ -9,7 +9,7 @@ namespace bonsai::tree {
             return Status::Failure;
 
         // FIX: Remember running state - don't reset state on re-entry
-        bool firstRun = (state_ != State::Running);
+
         state_ = State::Running;
 
         while (currentIndex_ < children_.size()) {
@@ -20,7 +20,7 @@ namespace bonsai::tree {
             }
             if (status == Status::Failure) {
                 // Only reset on failure, not on running
-                size_t failedIndex = currentIndex_;
+
                 reset();
                 return Status::Failure;
             }

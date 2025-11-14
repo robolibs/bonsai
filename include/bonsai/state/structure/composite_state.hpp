@@ -4,6 +4,9 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace bonsai::state {
 
@@ -36,6 +39,11 @@ namespace bonsai::state {
         StateMachine *getNestedMachine() { return nestedMachine_.get(); }
         const StateMachine *getNestedMachine() const { return nestedMachine_.get(); }
 
+        // Orthogonal regions support
+        void addRegion(const std::string &name, std::unique_ptr<StateMachine> machine);
+        std::vector<std::string> getRegionNames() const;
+        std::string getRegionCurrentState(const std::string &name) const;
+
         // History management
         void setHistoryType(HistoryType type) { historyType_ = type; }
         HistoryType getHistoryType() const { return historyType_; }
@@ -61,6 +69,13 @@ namespace bonsai::state {
       private:
         std::unique_ptr<StateMachine> nestedMachine_;
         HistoryType historyType_;
+
+        // Orthogonal regions
+        struct Region {
+            std::string name;
+            std::unique_ptr<StateMachine> machine;
+        };
+        std::vector<Region> regions_;
 
         // History storage
         std::string lastActiveState_;                              // For shallow history
