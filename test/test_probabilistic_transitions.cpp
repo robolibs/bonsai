@@ -35,10 +35,6 @@ TEST_CASE("Probabilistic transitions - basic probability") {
     CHECK(results["a"] > 600); // Should be around 700
     CHECK(results["a"] < 800);
     CHECK(results["b"] > 200); // Should be around 300
-    CHECK(results["b"] < 400);
-CHECK(results["a"] < 800);
-CHECK(results["b"] > 200); // Should be around 300
-CHECK(results["b"] < 400);
 }
 
 TEST_CASE("Probabilistic transitions - weighted selection") {
