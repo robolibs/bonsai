@@ -62,6 +62,64 @@ namespace bonsai::state {
             return *this;
         }
 
+        // Add a timed transition from current state to another state
+        Builder &transitionToAfter(const std::string &targetStateName, std::chrono::milliseconds duration,
+                                   Transition::Condition condition = nullptr) {
+            ensureCurrentState("transitionToAfter");
+
+            // Ensure target state exists
+            if (states_.find(targetStateName) == states_.end()) {
+                states_[targetStateName] = std::make_shared<State>(targetStateName);
+            }
+
+            auto trans = PendingTransition(currentStateName_, targetStateName, std::move(condition));
+            trans.duration = duration;
+            pendingTransitions_.push_back(std::move(trans));
+            return *this;
+        }
+
+        // Set action for the last added transition
+        Builder &withAction(Transition::Action action) {
+            if (pendingTransitions_.empty()) {
+                throw std::runtime_error("No transition to add action to. Call transitionTo() first.");
+            }
+            pendingTransitions_.back().action = std::move(action);
+            return *this;
+        }
+
+        // Set priority for the last added transition
+        Builder &withPriority(int priority) {
+            if (pendingTransitions_.empty()) {
+                throw std::runtime_error("No transition to add priority to. Call transitionTo() first.");
+            }
+            pendingTransitions_.back().priority = priority;
+            return *this;
+        }
+
+        // Set probability for the last added transition (0.0 to 1.0)
+        Builder &withProbability(float probability) {
+            if (pendingTransitions_.empty()) {
+                throw std::runtime_error("No transition to add probability to. Call transitionTo() first.");
+            }
+            if (probability < 0.0f || probability > 1.0f) {
+                throw std::invalid_argument("Probability must be between 0.0 and 1.0");
+            }
+            pendingTransitions_.back().probability = probability;
+            return *this;
+        }
+
+        // Set weight for the last added transition (non-negative)
+        Builder &withWeight(float weight) {
+            if (pendingTransitions_.empty()) {
+                throw std::runtime_error("No transition to add weight to. Call transitionTo() first.");
+            }
+            if (weight < 0.0f) {
+                throw std::invalid_argument("Weight must be non-negative");
+            }
+            pendingTransitions_.back().weight = weight;
+            return *this;
+        }
+
         // Mark transition as ignored (event is ignored, no state change)
         Builder &ignoreEvent() {
             ensureCurrentState("ignoreEvent");
@@ -167,7 +225,24 @@ namespace bonsai::state {
             // Add all transitions
             for (const auto &trans : pendingTransitions_) {
                 if (trans.result == TransitionResult::VALID) {
-                    machine->addTransition(states_[trans.from], states_[trans.to], trans.condition);
+                    auto transition = std::make_shared<Transition>(states_[trans.from], states_[trans.to],
+                                                                   trans.condition, trans.priority);
+
+                    // Apply optional features
+                    if (trans.duration.has_value()) {
+                        transition->setDuration(trans.duration.value());
+                    }
+                    if (trans.action.has_value()) {
+                        transition->setAction(trans.action.value());
+                    }
+                    if (trans.probability.has_value()) {
+                        transition->setProbability(trans.probability.value());
+                    }
+                    if (trans.weight.has_value()) {
+                        transition->setWeight(trans.weight.value());
+                    }
+
+                    machine->addTransition(transition);
                 } else {
                     // EVENT_IGNORED or CANNOT_HAPPEN
                     auto transition = std::make_shared<Transition>(states_[trans.from], trans.result);
@@ -195,6 +270,11 @@ namespace bonsai::state {
             std::string to;
             Transition::Condition condition;
             TransitionResult result;
+            std::optional<std::chrono::milliseconds> duration;
+            std::optional<Transition::Action> action;
+            int priority = 0;
+            std::optional<float> probability;
+            std::optional<float> weight;
 
             PendingTransition(std::string f, std::string t, Transition::Condition c)
                 : from(std::move(f)), to(std::move(t)), condition(std::move(c)), result(TransitionResult::VALID) {}

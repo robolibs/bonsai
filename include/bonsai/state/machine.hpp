@@ -56,6 +56,8 @@ namespace bonsai::state {
       private:
         void transitionTo(const StatePtr &newState);
         std::vector<TransitionPtr> getTransitionsFrom(const StatePtr &state) const;
+        void startTimersForState(const StatePtr &state);
+        void resetTimersForState(const StatePtr &state);
 
         StatePtr initialState_;
         StatePtr currentState_;

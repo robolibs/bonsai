@@ -2,6 +2,7 @@
 #include "bonsai/core/executor.hpp"
 #include <algorithm>
 #include <limits>
+#include <random>
 #include <stdexcept>
 
 namespace bonsai::state {
@@ -94,7 +95,9 @@ namespace bonsai::state {
                 size_t idx = indices[k];
                 bool ok = possibleTransitions[idx]->shouldTransition(blackboard_);
                 results[idx] = ok ? 1 : 0;
-                if (ok && possibleTransitions[idx]->getPriority() == maxPriority) {
+                // Only do early stop for non-probabilistic/non-weighted transitions
+                if (ok && possibleTransitions[idx]->getPriority() == maxPriority &&
+                    !possibleTransitions[idx]->isProbabilistic()) {
                     // Found the best possible transition; safe to stop further work
                     return false; // signal stop
                 }
@@ -102,20 +105,102 @@ namespace bonsai::state {
             },
             indices.size(), stop);
 
-        // Pick highest priority among true transitions
-        int bestPriority = std::numeric_limits<int>::min();
-        size_t chosen = static_cast<size_t>(-1);
+        // Collect valid transitions
+        std::vector<size_t> validIndices;
         for (size_t i = 0; i < possibleTransitions.size(); ++i) {
-            if (!results[i])
-                continue;
-            int pr = possibleTransitions[i]->getPriority();
-            if (pr > bestPriority) {
-                bestPriority = pr;
-                chosen = i;
+            if (results[i]) {
+                validIndices.push_back(i);
             }
         }
+
+        if (validIndices.empty()) {
+            return;
+        }
+
+        size_t chosen = static_cast<size_t>(-1);
+
+        // Separate probabilistic/weighted from non-probabilistic
+        std::vector<size_t> weightedIndices;
+        std::vector<size_t> probabilisticIndices;
+        std::vector<size_t> normalIndices;
+
+        for (size_t idx : validIndices) {
+            if (possibleTransitions[idx]->getWeight().has_value()) {
+                weightedIndices.push_back(idx);
+            } else if (possibleTransitions[idx]->getProbability().has_value()) {
+                probabilisticIndices.push_back(idx);
+            } else {
+                normalIndices.push_back(idx);
+            }
+        }
+
+        // Non-probabilistic transitions take precedence
+        if (!normalIndices.empty()) {
+            // Pick highest priority among normal transitions
+            int bestPriority = std::numeric_limits<int>::min();
+            for (size_t idx : normalIndices) {
+                int pr = possibleTransitions[idx]->getPriority();
+                if (pr > bestPriority) {
+                    bestPriority = pr;
+                    chosen = idx;
+                }
+            }
+        } else if (!weightedIndices.empty()) {
+            // Weighted random selection
+            thread_local std::mt19937 rng(std::random_device{}());
+            float totalWeight = 0.0f;
+            for (size_t idx : weightedIndices) {
+                totalWeight += possibleTransitions[idx]->getWeight().value();
+            }
+
+            if (totalWeight <= 0.0f) {
+                // All weights are zero, pick first one
+                chosen = weightedIndices[0];
+            } else {
+                std::uniform_real_distribution<float> dist(0.0f, totalWeight);
+                float random = dist(rng);
+                float cumulative = 0.0f;
+
+                for (size_t idx : weightedIndices) {
+                    cumulative += possibleTransitions[idx]->getWeight().value();
+                    if (random <= cumulative) {
+                        chosen = idx;
+                        break;
+                    }
+                }
+            }
+        } else if (!probabilisticIndices.empty()) {
+            // Probability-based selection - each transition tested independently in order
+            thread_local std::mt19937 rng(std::random_device{}());
+            std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+
+            for (size_t idx : probabilisticIndices) {
+                float prob = possibleTransitions[idx]->getProbability().value();
+                if (prob > 0.0f) {
+                    float roll = dist(rng);
+                    if (roll < prob) {
+                        chosen = idx;
+                        break;
+                    }
+                }
+            }
+            // If no transition succeeded, chosen remains -1 (stay in current state)
+        } else {
+            // Pick highest priority among transitions (fallback)
+            int bestPriority = std::numeric_limits<int>::min();
+            for (size_t idx : validIndices) {
+                int pr = possibleTransitions[idx]->getPriority();
+                if (pr > bestPriority) {
+                    bestPriority = pr;
+                    chosen = idx;
+                }
+            }
+        }
+
         if (chosen != static_cast<size_t>(-1)) {
-            transitionTo(possibleTransitions[chosen]->to());
+            auto &transition = possibleTransitions[chosen];
+            transition->executeAction(blackboard_);
+            transitionTo(transition->to());
         }
     }
 
@@ -149,17 +234,40 @@ namespace bonsai::state {
         if (currentState_) {
             currentState_->onExit(blackboard_);
             previousState_ = currentState_; // FIX: Track previous state
+            // Reset timers for the old state
+            resetTimersForState(currentState_);
         }
 
         // Enter new state
         currentState_ = newState;
         currentState_->onEnter(blackboard_);
 
+        // Start timers for the new state
+        startTimersForState(newState);
+
         // FIX: Add to history
         if (stateHistory_.size() >= MAX_HISTORY) {
             stateHistory_.erase(stateHistory_.begin());
         }
         stateHistory_.push_back(newState->name());
+    }
+
+    void StateMachine::startTimersForState(const StatePtr &state) {
+        auto transitions = getTransitionsFrom(state);
+        for (auto &transition : transitions) {
+            if (transition->isTimedTransition()) {
+                transition->startTimer();
+            }
+        }
+    }
+
+    void StateMachine::resetTimersForState(const StatePtr &state) {
+        auto transitions = getTransitionsFrom(state);
+        for (auto &transition : transitions) {
+            if (transition->isTimedTransition()) {
+                transition->resetTimer();
+            }
+        }
     }
 
     void StateMachine::transitionToPrevious() {

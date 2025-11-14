@@ -1,8 +1,10 @@
 #pragma once
 #include "../../tree/structure/blackboard.hpp"
 #include "state.hpp"
+#include <chrono>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -19,6 +21,8 @@ namespace bonsai::state {
       public:
         using Condition = std::function<bool(tree::Blackboard &)>;
         using Action = std::function<void(tree::Blackboard &)>;
+        using Duration = std::chrono::milliseconds;
+        using TimePoint = std::chrono::steady_clock::time_point;
 
         Transition(StatePtr from, StatePtr to, Condition condition, int priority = 0)
             : from_(std::move(from)), to_(std::move(to)), condition_(std::move(condition)),
@@ -37,7 +41,20 @@ namespace bonsai::state {
             if (result_ != TransitionResult::VALID) {
                 return false;
             }
-            return condition_ && condition_(blackboard);
+
+            // Check timed transition
+            if (isTimedTransition() && hasTimerStarted()) {
+                auto elapsed = std::chrono::steady_clock::now() - timerStartTime_.value();
+                if (elapsed >= duration_.value()) {
+                    // Timer expired - check condition if present, otherwise allow transition
+                    return !condition_ || condition_(blackboard);
+                }
+                // Timer not expired yet
+                return false;
+            }
+
+            // Check condition - if no condition, allow transition (for weighted/probabilistic)
+            return !condition_ || condition_(blackboard);
         }
 
         // Check transition validity
@@ -62,6 +79,31 @@ namespace bonsai::state {
         }
         int getPriority() const { return priority_; }
 
+        // Timed transition support
+        void setDuration(Duration duration) { duration_ = duration; }
+        bool isTimedTransition() const { return duration_.has_value(); }
+        void startTimer() { timerStartTime_ = std::chrono::steady_clock::now(); }
+        void resetTimer() { timerStartTime_.reset(); }
+        bool hasTimerStarted() const { return timerStartTime_.has_value(); }
+        std::optional<Duration> getDuration() const { return duration_; }
+
+        // Probabilistic transition support
+        void setProbability(float probability) {
+            if (probability < 0.0f || probability > 1.0f) {
+                throw std::invalid_argument("Probability must be between 0.0 and 1.0");
+            }
+            probability_ = probability;
+        }
+        void setWeight(float weight) {
+            if (weight < 0.0f) {
+                throw std::invalid_argument("Weight must be non-negative");
+            }
+            weight_ = weight;
+        }
+        bool isProbabilistic() const { return probability_.has_value() || weight_.has_value(); }
+        std::optional<float> getProbability() const { return probability_; }
+        std::optional<float> getWeight() const { return weight_; }
+
       private:
         StatePtr from_;
         StatePtr to_;
@@ -69,6 +111,14 @@ namespace bonsai::state {
         TransitionResult result_;
         int priority_ = 0; // FIX: Add priority for transition ordering
         Action action_;    // FIX: Add transition actions
+
+        // Timed transitions
+        std::optional<Duration> duration_;
+        std::optional<TimePoint> timerStartTime_;
+
+        // Probabilistic transitions
+        std::optional<float> probability_;
+        std::optional<float> weight_;
     };
 
     using TransitionPtr = std::shared_ptr<Transition>;
