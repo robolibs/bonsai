@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <bonsai/bonsai.hpp>
 #include <bonsai/tree/events.hpp>
 #include <doctest/doctest.h>
