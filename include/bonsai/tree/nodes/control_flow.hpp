@@ -136,4 +136,59 @@ namespace bonsai::tree {
         size_t currentIndex_ = 0;
     };
 
+    // Reactive Sequence - re-checks earlier conditions during execution
+    class ReactiveSequence : public Node {
+      public:
+        using ConditionFunc = std::function<bool(Blackboard &)>;
+
+        void addChild(NodePtr child, ConditionFunc condition = nullptr);
+        Status tick(Blackboard &blackboard) override;
+        void reset() override;
+        void halt() override;
+
+      private:
+        struct ReactiveChild {
+            NodePtr node;
+            ConditionFunc condition;
+        };
+        std::vector<ReactiveChild> children_;
+        size_t currentIndex_ = 0;
+    };
+
+    // Dynamic Selector - re-evaluates priorities during execution
+    class DynamicSelector : public Node {
+      public:
+        using PriorityFunc = std::function<float(Blackboard &)>;
+
+        void addChild(NodePtr child, PriorityFunc priorityFunc);
+        Status tick(Blackboard &blackboard) override;
+        void reset() override;
+        void halt() override;
+
+      private:
+        struct PriorityChild {
+            NodePtr node;
+            PriorityFunc priorityFunc;
+        };
+        std::vector<PriorityChild> children_;
+        size_t currentIndex_ = SIZE_MAX;
+    };
+
+    // Subtree Reference - reuses a behavior tree as a node
+    class SubtreeNode : public Node {
+      public:
+        explicit SubtreeNode(NodePtr subtreeRoot);
+
+        Status tick(Blackboard &blackboard) override;
+        void reset() override;
+        void halt() override;
+
+        // Allow changing the subtree dynamically
+        void setSubtree(NodePtr subtreeRoot);
+        NodePtr getSubtree() const { return subtreeRoot_; }
+
+      private:
+        NodePtr subtreeRoot_;
+    };
+
 } // namespace bonsai::tree

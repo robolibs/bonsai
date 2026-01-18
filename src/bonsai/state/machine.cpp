@@ -2,6 +2,7 @@
 #include "bonsai/core/executor.hpp"
 #include <algorithm>
 #include <limits>
+#include <random>
 #include <stdexcept>
 
 namespace bonsai::state {
@@ -54,6 +55,19 @@ namespace bonsai::state {
         // Update current state
         currentState_->onUpdate(blackboard_);
 
+        // Debug: state updated
+        if (debugCallback_) {
+            DebugInfo info;
+            info.event = DebugEvent::STATE_UPDATED;
+            info.fromState = currentState_->name();
+            info.toState = currentState_->name();
+            info.transitionInfo = "";
+            info.timestamp = std::chrono::steady_clock::now();
+            info.guardPassed = true;
+            info.priority = 0;
+            notifyDebug(info);
+        }
+
         // Check for transitions - evaluate conditions in parallel then pick highest priority
         auto possibleTransitions = getTransitionsFrom(currentState_);
         if (possibleTransitions.empty()) {
@@ -94,7 +108,9 @@ namespace bonsai::state {
                 size_t idx = indices[k];
                 bool ok = possibleTransitions[idx]->shouldTransition(blackboard_);
                 results[idx] = ok ? 1 : 0;
-                if (ok && possibleTransitions[idx]->getPriority() == maxPriority) {
+                // Only do early stop for non-probabilistic/non-weighted transitions
+                if (ok && possibleTransitions[idx]->getPriority() == maxPriority &&
+                    !possibleTransitions[idx]->isProbabilistic()) {
                     // Found the best possible transition; safe to stop further work
                     return false; // signal stop
                 }
@@ -102,20 +118,113 @@ namespace bonsai::state {
             },
             indices.size(), stop);
 
-        // Pick highest priority among true transitions
-        int bestPriority = std::numeric_limits<int>::min();
-        size_t chosen = static_cast<size_t>(-1);
+        // Collect valid transitions
+        std::vector<size_t> validIndices;
         for (size_t i = 0; i < possibleTransitions.size(); ++i) {
-            if (!results[i])
-                continue;
-            int pr = possibleTransitions[i]->getPriority();
-            if (pr > bestPriority) {
-                bestPriority = pr;
-                chosen = i;
+            if (results[i]) {
+                validIndices.push_back(i);
             }
         }
+
+        if (validIndices.empty()) {
+            return;
+        }
+
+        size_t chosen = static_cast<size_t>(-1);
+
+        // Separate probabilistic/weighted from non-probabilistic
+        std::vector<size_t> weightedIndices;
+        std::vector<size_t> probabilisticIndices;
+        std::vector<size_t> normalIndices;
+
+        for (size_t idx : validIndices) {
+            if (possibleTransitions[idx]->getWeight().has_value()) {
+                weightedIndices.push_back(idx);
+            } else if (possibleTransitions[idx]->getProbability().has_value()) {
+                probabilisticIndices.push_back(idx);
+            } else {
+                normalIndices.push_back(idx);
+            }
+        }
+
+        // Non-probabilistic transitions take precedence
+        if (!normalIndices.empty()) {
+            // Pick highest priority among normal transitions
+            int bestPriority = std::numeric_limits<int>::min();
+            for (size_t idx : normalIndices) {
+                int pr = possibleTransitions[idx]->getPriority();
+                if (pr > bestPriority) {
+                    bestPriority = pr;
+                    chosen = idx;
+                }
+            }
+        } else if (!weightedIndices.empty()) {
+            // Weighted random selection
+            thread_local std::mt19937 rng(std::random_device{}());
+            float totalWeight = 0.0f;
+            for (size_t idx : weightedIndices) {
+                totalWeight += possibleTransitions[idx]->getWeight().value();
+            }
+
+            if (totalWeight <= 0.0f) {
+                // All weights are zero, pick first one
+                chosen = weightedIndices[0];
+            } else {
+                std::uniform_real_distribution<float> dist(0.0f, totalWeight);
+                float random = dist(rng);
+                float cumulative = 0.0f;
+
+                for (size_t idx : weightedIndices) {
+                    cumulative += possibleTransitions[idx]->getWeight().value();
+                    if (random <= cumulative) {
+                        chosen = idx;
+                        break;
+                    }
+                }
+            }
+        } else if (!probabilisticIndices.empty()) {
+            // Probability-based selection - each transition tested independently in order
+            thread_local std::mt19937 rng(std::random_device{}());
+            std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+
+            for (size_t idx : probabilisticIndices) {
+                float prob = possibleTransitions[idx]->getProbability().value();
+                if (prob > 0.0f) {
+                    float roll = dist(rng);
+                    if (roll < prob) {
+                        chosen = idx;
+                        break;
+                    }
+                }
+            }
+            // If no transition succeeded, chosen remains -1 (stay in current state)
+        } else {
+            // Pick highest priority among transitions (fallback)
+            int bestPriority = std::numeric_limits<int>::min();
+            for (size_t idx : validIndices) {
+                int pr = possibleTransitions[idx]->getPriority();
+                if (pr > bestPriority) {
+                    bestPriority = pr;
+                    chosen = idx;
+                }
+            }
+        }
+
         if (chosen != static_cast<size_t>(-1)) {
-            transitionTo(possibleTransitions[chosen]->to());
+            auto &transition = possibleTransitions[chosen];
+
+            // Determine transition reason
+            std::string reason = "condition";
+            if (transition->isTimedTransition()) {
+                reason = "timed";
+            } else if (transition->getWeight().has_value()) {
+                reason = "weighted";
+            } else if (transition->getProbability().has_value()) {
+                reason = "probabilistic";
+            }
+
+            transition->executeAction(blackboard_);
+            transitionTo(transition->to(), reason);
         }
     }
 
@@ -135,31 +244,129 @@ namespace bonsai::state {
         return currentState_ ? currentState_->name() : empty;
     }
 
-    void StateMachine::transitionTo(const StatePtr &newState) {
+    void StateMachine::transitionTo(const StatePtr &newState) { transitionTo(newState, "condition"); }
+
+    void StateMachine::transitionTo(const StatePtr &newState, const std::string &reason) {
         if (!newState) {
             return;
         }
 
         // FIX: Check guard condition BEFORE exiting current state
         if (!newState->onGuard(blackboard_)) {
+            // Debug: guard rejected
+            if (debugCallback_) {
+                DebugInfo info;
+                info.event = DebugEvent::TRANSITION_REJECTED;
+                info.fromState = currentState_ ? currentState_->name() : "";
+                info.toState = newState->name();
+                info.transitionInfo = reason;
+                info.timestamp = std::chrono::steady_clock::now();
+                info.guardPassed = false;
+                info.priority = 0;
+                notifyDebug(info);
+            }
             return;
         }
 
+        std::string fromStateName = currentState_ ? currentState_->name() : "";
+
         // Exit current state
         if (currentState_) {
+            // Debug: state exited
+            if (debugCallback_) {
+                DebugInfo info;
+                info.event = DebugEvent::STATE_EXITED;
+                info.fromState = currentState_->name();
+                info.toState = newState->name();
+                info.transitionInfo = reason;
+                info.timestamp = std::chrono::steady_clock::now();
+                info.guardPassed = true;
+                info.priority = 0;
+                notifyDebug(info);
+            }
+
             currentState_->onExit(blackboard_);
             previousState_ = currentState_; // FIX: Track previous state
+            // Reset timers for the old state
+            resetTimersForState(currentState_);
+        }
+
+        // Record transition
+        if (trackTransitionHistory_) {
+            TransitionRecord record;
+            record.fromState = fromStateName;
+            record.toState = newState->name();
+            record.timestamp = std::chrono::steady_clock::now();
+            record.reason = reason;
+
+            if (transitionHistory_.size() >= MAX_TRANSITION_HISTORY) {
+                transitionHistory_.erase(transitionHistory_.begin());
+            }
+            transitionHistory_.push_back(record);
+        }
+
+        // Debug: transition taken
+        if (debugCallback_) {
+            DebugInfo info;
+            info.event = DebugEvent::TRANSITION_TAKEN;
+            info.fromState = fromStateName;
+            info.toState = newState->name();
+            info.transitionInfo = reason;
+            info.timestamp = std::chrono::steady_clock::now();
+            info.guardPassed = true;
+            info.priority = 0;
+            notifyDebug(info);
         }
 
         // Enter new state
         currentState_ = newState;
         currentState_->onEnter(blackboard_);
 
+        // Debug: state entered
+        if (debugCallback_) {
+            DebugInfo info;
+            info.event = DebugEvent::STATE_ENTERED;
+            info.fromState = fromStateName;
+            info.toState = newState->name();
+            info.transitionInfo = reason;
+            info.timestamp = std::chrono::steady_clock::now();
+            info.guardPassed = true;
+            info.priority = 0;
+            notifyDebug(info);
+        }
+
+        // Start timers for the new state
+        startTimersForState(newState);
+
         // FIX: Add to history
         if (stateHistory_.size() >= MAX_HISTORY) {
             stateHistory_.erase(stateHistory_.begin());
         }
         stateHistory_.push_back(newState->name());
+    }
+
+    void StateMachine::notifyDebug(const DebugInfo &info) {
+        if (debugCallback_) {
+            debugCallback_(info);
+        }
+    }
+
+    void StateMachine::startTimersForState(const StatePtr &state) {
+        auto transitions = getTransitionsFrom(state);
+        for (auto &transition : transitions) {
+            if (transition->isTimedTransition()) {
+                transition->startTimer();
+            }
+        }
+    }
+
+    void StateMachine::resetTimersForState(const StatePtr &state) {
+        auto transitions = getTransitionsFrom(state);
+        for (auto &transition : transitions) {
+            if (transition->isTimedTransition()) {
+                transition->resetTimer();
+            }
+        }
     }
 
     void StateMachine::transitionToPrevious() {

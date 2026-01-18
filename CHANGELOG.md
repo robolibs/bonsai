@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.0.2] - 2026-01-18
+
+### <!-- 0 -->⛰️  Features
+
+- Add advanced behavior tree nodes and builders
+- Support behavior tree reactive and subtree nodes
+- Implement reactive behaviors and event-driven communication
+- Implement Graphviz export for state machines and behavior trees
+- Visualize behavior trees and state machines with Graphviz
+- Feat(state-machine): Add debug and history tracking
+- Add timed, probabilistic, and weighted transitions
+
+### <!-- 3 -->📚 Documentation
+
+- Move `TUTORIAL.md` into the `docs` directory
+- Docs: Improve and simplify Bonsai project documentation
+
+### <!-- 6 -->🧪 Testing
+
+- Implement and test state machine debugging features
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Refactor build system with PROJECT file
+- Add devbox.lock and compile_commands.json to gitignore
+
 ## [0.3.0] - 2025-11-13
 
 ### <!-- 0 -->⛰️  Features

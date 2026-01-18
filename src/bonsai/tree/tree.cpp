@@ -1,8 +1,9 @@
 #include "bonsai/tree/tree.hpp"
+#include "bonsai/tree/events.hpp"
 
 namespace bonsai::tree {
 
-    Tree::Tree(NodePtr root) : root_(std::move(root)) {}
+    Tree::Tree(NodePtr root) : root_(std::move(root)), eventBus_(std::make_shared<EventBus>()) {}
 
     Status Tree::tick() {
         if (!root_)
@@ -29,5 +30,9 @@ namespace bonsai::tree {
     const Blackboard &Tree::blackboard() const { return blackboard_; }
 
     NodePtr Tree::getRoot() const { return root_; }
+
+    EventBus &Tree::events() { return *eventBus_; }
+
+    const EventBus &Tree::events() const { return *eventBus_; }
 
 } // namespace bonsai::tree

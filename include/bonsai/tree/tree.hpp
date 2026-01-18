@@ -1,6 +1,12 @@
 #pragma once
 #include "structure/blackboard.hpp"
 #include "structure/node.hpp"
+#include <memory>
+
+// Forward declare EventBus to avoid heavy include
+namespace bonsai::tree {
+    class EventBus;
+}
 
 namespace bonsai::tree {
 
@@ -16,9 +22,14 @@ namespace bonsai::tree {
         const Blackboard &blackboard() const;
         NodePtr getRoot() const;
 
+        // Event bus access
+        EventBus &events();
+        const EventBus &events() const;
+
       private:
         NodePtr root_;
         Blackboard blackboard_;
+        std::shared_ptr<EventBus> eventBus_;
     };
 
     // Alias for backward compatibility with howto.md examples

@@ -1,5 +1,6 @@
 #pragma once
 #include "nodes/action.hpp"
+#include "nodes/advanced.hpp"
 #include "nodes/control_flow.hpp"
 #include "nodes/decorator.hpp"
 #include "nodes/parallel.hpp"
@@ -56,6 +57,17 @@ namespace bonsai::tree {
         Builder &memory(MemoryNode::MemoryPolicy policy = MemoryNode::MemoryPolicy::REMEMBER_FINISHED);
         Builder &conditionalSequence();
 
+        // New reactive and dynamic nodes
+        Builder &reactiveSequence();
+        Builder &dynamicSelector();
+        Builder &subtree(NodePtr subtreeRoot);
+
+        // Advanced nodes
+        Builder &randomSelector();
+        Builder &probabilitySelector();
+        Builder &oneShotSequence();
+        Builder &debounce(std::chrono::milliseconds debounceTime);
+
       private:
         void add(const NodePtr &node);
         NodePtr applyPendingDecorators(NodePtr node);
@@ -73,6 +85,7 @@ namespace bonsai::tree {
 
         // Pending structural decorator nodes
         std::optional<MemoryNode::MemoryPolicy> pendingMemoryPolicy_ = std::nullopt;
+        std::optional<std::chrono::milliseconds> pendingDebounceTime_ = std::nullopt;
 
         // For switch node building
         std::shared_ptr<SwitchNode> currentSwitch_ = nullptr;
