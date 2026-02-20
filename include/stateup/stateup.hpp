@@ -21,5 +21,8 @@
 // State machine
 #include "state/state.hpp"
 
+// Logic / Datalog engine
+#include "logic/logic.hpp"
+
 // Namespace aliases
 namespace su = stateup;

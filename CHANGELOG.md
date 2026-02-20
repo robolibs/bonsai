@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.4] - 2026-02-20
+
+### <!-- 0 -->⛰️  Features
+
+- Introduce Datalog engine with semi-naive evaluation
+
 ## [0.0.3] - 2026-02-20
 
 ### <!-- 2 -->🚜 Refactor
