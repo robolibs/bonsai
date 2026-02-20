@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.3] - 2026-02-20
+
+### <!-- 2 -->🚜 Refactor
+
+- Rename project to Stateup
+
 ## [0.0.2] - 2026-01-18
 
 ### <!-- 0 -->⛰️  Features
@@ -15,7 +21,7 @@
 ### <!-- 3 -->📚 Documentation
 
 - Move `TUTORIAL.md` into the `docs` directory
-- Docs: Improve and simplify Bonsai project documentation
+- Docs: Improve and simplify Stateup project documentation
 
 ### <!-- 6 -->🧪 Testing
 
@@ -33,7 +39,7 @@
 - Add orthogonal regions support to composite states
 - Implement memory node policies and builder integration
 - Introduce parallel coroutine execution with early stopping
-- Add coroutine task support to bonsai tree nodes
+- Add coroutine task support to stateup tree nodes
 - Introduce pluggable thread pools with early-stop optimizations
 - Introduce asynchronous task execution and parallel processing
 - Implement hierarchical state machines
@@ -50,7 +56,7 @@
 ### <!-- 1 -->🐛 Bug Fixes
 
 - Refactor core behavior tree logic for improved robustness
-- Moves everything under bonsai::tree
+- Moves everything under stateup::tree
 
 ### <!-- 2 -->🚜 Refactor
 

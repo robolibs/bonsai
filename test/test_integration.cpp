@@ -1,9 +1,9 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <chrono>
 #include <doctest/doctest.h>
 #include <thread>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Helper class to simulate a robot for testing
 class TestRobot {

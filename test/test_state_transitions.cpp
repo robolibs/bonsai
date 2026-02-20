@@ -1,9 +1,9 @@
 #include "doctest/doctest.h"
 
-#include "bonsai/state/builder.hpp"
+#include "stateup/state/builder.hpp"
 #include <string>
 
-using namespace bonsai;
+using namespace stateup;
 
 TEST_CASE("Transition: Basic valid transition") {
     auto machine = state::Builder()

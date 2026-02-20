@@ -1,12 +1,12 @@
 #include <doctest/doctest.h>
 
-#include "bonsai/state/builder.hpp"
-#include "bonsai/state/machine.hpp"
+#include "stateup/state/builder.hpp"
+#include "stateup/state/machine.hpp"
 #include <chrono>
 #include <thread>
 #include <vector>
 
-using namespace bonsai::state;
+using namespace stateup::state;
 using namespace std::chrono_literals;
 
 TEST_CASE("Debugging - basic debug callback") {

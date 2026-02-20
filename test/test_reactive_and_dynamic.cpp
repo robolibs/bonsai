@@ -1,8 +1,8 @@
-#include <bonsai/bonsai.hpp>
-#include <bonsai/tree/events.hpp>
+#include <stateup/stateup.hpp>
+#include <stateup/tree/events.hpp>
 #include <doctest/doctest.h>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // ============================================================================
 // Reactive Sequence Tests

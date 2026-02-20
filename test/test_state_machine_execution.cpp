@@ -1,10 +1,10 @@
 #include "doctest/doctest.h"
 
-#include "bonsai/state/builder.hpp"
-#include "bonsai/state/machine.hpp"
+#include "stateup/state/builder.hpp"
+#include "stateup/state/machine.hpp"
 #include <string>
 
-using namespace bonsai;
+using namespace stateup;
 
 // Test states for state machine execution
 class IdleState : public state::State {

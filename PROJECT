@@ -18,8 +18,8 @@
 # Lines starting with # are comments
 # ==============================================================================
 
-bonsai
-0.0.2
+stateup
+0.0.3
 
 [lib]
 echo|https://github.com/bresilla/echo.git|0.0.25

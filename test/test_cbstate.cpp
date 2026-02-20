@@ -1,9 +1,9 @@
 #include "doctest/doctest.h"
 
-#include "bonsai/state/state.hpp"
+#include "stateup/state/state.hpp"
 #include <string>
 
-using namespace bonsai;
+using namespace stateup;
 
 TEST_CASE("CbState: Simple callback state with update only") {
     auto machine = std::make_unique<state::StateMachine>();

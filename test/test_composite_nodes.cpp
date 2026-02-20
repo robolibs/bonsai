@@ -1,9 +1,9 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <doctest/doctest.h>
 #include <functional>
 #include <memory>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 namespace {
     struct TrackingNode : Node {

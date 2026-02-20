@@ -1,10 +1,10 @@
-#include <bonsai/bonsai.hpp>
-#include <bonsai/tree/nodes/advanced.hpp>
+#include <stateup/stateup.hpp>
+#include <stateup/tree/nodes/advanced.hpp>
 #include <doctest/doctest.h>
 #include <thread>
 #include <unordered_set>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // ============================================================================
 // RandomSelector Tests

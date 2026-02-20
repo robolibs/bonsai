@@ -1,10 +1,10 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <doctest/doctest.h>
 #include <string>
 #include <thread>
 #include <vector>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 TEST_CASE("Blackboard basic operations") {
     Blackboard bb;

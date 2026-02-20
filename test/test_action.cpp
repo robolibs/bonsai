@@ -1,8 +1,8 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <coroutine>
 #include <doctest/doctest.h>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 TEST_CASE("Action node basic functionality") {
     Blackboard bb;
@@ -147,7 +147,7 @@ TEST_CASE("Action node halt functionality") {
 TEST_CASE("Action coroutine task progresses and completes") {
     Blackboard bb;
 
-    auto coroutine_action = Action(Action::TaskFunc([](Blackboard &) -> bonsai::core::task<Status> {
+    auto coroutine_action = Action(Action::TaskFunc([](Blackboard &) -> stateup::core::task<Status> {
         co_await std::suspend_always{}; // first tick -> Running
         co_await std::suspend_always{}; // second tick -> Running
         co_return Status::Success;      // third tick -> Success
@@ -161,7 +161,7 @@ TEST_CASE("Action coroutine task progresses and completes") {
 TEST_CASE("Action coroutine reset and halt behavior") {
     Blackboard bb;
 
-    auto coroutine_action = Action(Action::TaskFunc([](Blackboard &) -> bonsai::core::task<Status> {
+    auto coroutine_action = Action(Action::TaskFunc([](Blackboard &) -> stateup::core::task<Status> {
         co_await std::suspend_always{};
         co_await std::suspend_always{};
         co_return Status::Success;
@@ -183,7 +183,7 @@ TEST_CASE("Action coroutine reset and halt behavior") {
 }
 
 TEST_CASE("Builder actionTask integrates coroutine actions") {
-    using bonsai::core::task;
+    using stateup::core::task;
 
     auto tree = Builder()
                     .sequence()

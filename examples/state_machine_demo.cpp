@@ -1,8 +1,8 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <iostream>
 #include <memory>
 
-using namespace bonsai;
+using namespace stateup;
 
 // Example 1: Simple traffic light state machine
 void trafficLightExample() {
@@ -177,7 +177,7 @@ void enemyAIExample() {
 }
 
 int main() {
-    std::cout << "Bonsai State Machine Examples" << std::endl;
+    std::cout << "Stateup State Machine Examples" << std::endl;
     std::cout << "==============================" << std::endl;
 
     trafficLightExample();

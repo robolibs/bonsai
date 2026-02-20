@@ -1,6 +1,6 @@
 <img align="right" width="26%" src="./misc/logo.png"> 
 
-# Bonsai
+# Stateup
 
 High-performance C++20 behavior trees and hierarchical state machines with parallel execution.
 
@@ -17,7 +17,7 @@ High-performance C++20 behavior trees and hierarchical state machines with paral
 📖 **[Tutorial Guide](TUTORIAL.md)** | 🎮 **[Interactive Demo](examples/getting_started_tutorial.cpp)**
 
 ```bash
-cmake -B build -DBONSAI_BUILD_EXAMPLES=ON
+cmake -B build -DSTATEUP_BUILD_EXAMPLES=ON
 cmake --build build
 ./build/getting_started_tutorial
 ```
@@ -27,8 +27,8 @@ cmake --build build
 ### Simple Behavior Tree
 
 ```cpp
-#include <bonsai/bonsai.hpp>
-using namespace bonsai::tree;
+#include <stateup/stateup.hpp>
+using namespace stateup::tree;
 
 auto tree = Builder()
     .sequence()
@@ -49,7 +49,7 @@ tree.tick(); // Prints: Hello World!
 ### State Machine with Parallel Regions
 
 ```cpp
-using namespace bonsai::state;
+using namespace stateup::state;
 
 auto machine = Builder()
     .compositeState("Combat", CompositeState::HistoryType::Deep,
@@ -121,18 +121,18 @@ auto hp = bb.get<int>("health"); // Returns std::optional
 ```cmake
 # Using FetchContent
 include(FetchContent)
-FetchContent_Declare(bonsai
-    GIT_REPOSITORY https://github.com/your-repo/bonsai
+FetchContent_Declare(stateup
+    GIT_REPOSITORY https://github.com/your-repo/stateup
     GIT_TAG main)
-FetchContent_MakeAvailable(bonsai)
-target_link_libraries(your_target bonsai::bonsai)
+FetchContent_MakeAvailable(stateup)
+target_link_libraries(your_target stateup::stateup)
 ```
 
 ## Building
 
 ```bash
 mkdir build && cd build
-cmake .. -DBONSAI_BUILD_EXAMPLES=ON -DBONSAI_ENABLE_TESTS=ON
+cmake .. -DSTATEUP_BUILD_EXAMPLES=ON -DSTATEUP_ENABLE_TESTS=ON
 make -j
 make test  # Run tests
 ```

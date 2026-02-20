@@ -1,7 +1,7 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <iostream>
 
-using namespace bonsai;
+using namespace stateup;
 
 // Example demonstrating Guard/Entry/Exit lifecycle
 void doorLockExample() {
@@ -176,7 +176,7 @@ void resourceManagerExample() {
 }
 
 int main() {
-    std::cout << "Bonsai State Machine - Guard/Entry/Exit Lifecycle Demo" << std::endl;
+    std::cout << "Stateup State Machine - Guard/Entry/Exit Lifecycle Demo" << std::endl;
     std::cout << "=======================================================" << std::endl;
 
     doorLockExample();

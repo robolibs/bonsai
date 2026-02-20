@@ -1,9 +1,9 @@
 #include "doctest/doctest.h"
 
-#include "bonsai/state/state.hpp"
+#include "stateup/state/state.hpp"
 #include <string>
 
-using namespace bonsai;
+using namespace stateup;
 
 // Test states for basic functionality
 class TestStateA : public state::State {

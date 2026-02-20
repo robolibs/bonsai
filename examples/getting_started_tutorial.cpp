@@ -1,14 +1,14 @@
 // ========================================
-// Bonsai Behavior Tree Library
+// Stateup Behavior Tree Library
 // Getting Started Tutorial
 // ========================================
 //
-// This comprehensive tutorial demonstrates how to use the Bonsai behavior tree
+// This comprehensive tutorial demonstrates how to use the Stateup behavior tree
 // library step by step, building from simple concepts to advanced patterns.
 //
 // Run this example to see behavior trees in action!
 
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -16,7 +16,7 @@
 #include <thread>
 #include <vector>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 void printSeparator(const std::string &title) {
     std::cout << "\n" << std::string(60, '=') << std::endl;
@@ -471,7 +471,7 @@ int main() {
     // ========================================
 
     printSeparator("TUTORIAL COMPLETE!");
-    std::cout << "🎉 Congratulations! You've learned how to use behavior trees with Bonsai!\n" << std::endl;
+    std::cout << "🎉 Congratulations! You've learned how to use behavior trees with Stateup!\n" << std::endl;
 
     std::cout << "Key concepts covered:" << std::endl;
     std::cout << "✓ Actions and Status values" << std::endl;

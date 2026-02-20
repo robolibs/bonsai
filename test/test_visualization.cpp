@@ -1,13 +1,13 @@
 #include <doctest/doctest.h>
 
-#include "bonsai/state/builder.hpp"
-#include "bonsai/state/machine.hpp"
-#include "bonsai/tree/builder.hpp"
-#include "bonsai/tree/tree.hpp"
-#include "bonsai/visualization/visualization.hpp"
+#include "stateup/state/builder.hpp"
+#include "stateup/state/machine.hpp"
+#include "stateup/tree/builder.hpp"
+#include "stateup/tree/tree.hpp"
+#include "stateup/visualization/visualization.hpp"
 
-using namespace bonsai;
-using namespace bonsai::visualization;
+using namespace stateup;
+using namespace stateup::visualization;
 
 TEST_CASE("Visualization - basic state machine export") {
     state::Builder builder;
