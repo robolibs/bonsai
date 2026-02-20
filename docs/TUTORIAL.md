@@ -1,4 +1,4 @@
-# Bonsai Behavior Tree Tutorial
+# Stateup Behavior Tree Tutorial
 
 ```
    ____                        _ 
@@ -11,7 +11,7 @@
    Behavior Tree Library Tutorial
 ```
 
-Welcome to the comprehensive Bonsai behavior tree tutorial! This guide will take you from beginner to advanced usage through practical examples and clear explanations.
+Welcome to the comprehensive Stateup behavior tree tutorial! This guide will take you from beginner to advanced usage through practical examples and clear explanations.
 
 ## Table of Contents
 
@@ -32,10 +32,10 @@ Welcome to the comprehensive Bonsai behavior tree tutorial! This guide will take
 Actions are the building blocks of behavior trees. They return `Status::Success`, `Status::Failure`, or `Status::Running`.
 
 ```cpp
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <iostream>
 
-using namespace bonsai;
+using namespace stateup;
 
 int main() {
     // Create simple actions with different outcomes
@@ -324,7 +324,7 @@ std::cout << "Result: " << (parallel_result == Status::Success ? "SUCCESS" : "FA
 - For finer control, pass thresholds with `.parallel(successThreshold, failureThreshold)`:
   - `successThreshold` = minimum number of successes required (e.g., `.parallel(2)` succeeds once two children succeed)
   - `failureThreshold` = optional number of failures that trigger Failure (omit to require all children to fail)
-  - Bonsai automatically halts remaining children once either threshold is met or when it becomes impossible to reach the success threshold
+  - Stateup automatically halts remaining children once either threshold is met or when it becomes impossible to reach the success threshold
 - Perfect for simultaneous monitoring and actions
 
 ---
@@ -333,7 +333,7 @@ std::cout << "Result: " << (parallel_result == Status::Success ? "SUCCESS" : "FA
 
 Decorators wrap other nodes and modify their behavior. They're like filters or modifiers for node results.
 
-> **Tip:** Decorators always apply to the **next** node you declare—this can be an action or a composite such as `sequence()` or `selector()`. If you try to call `end()` or `build()` while a decorator/repeat/retry is still pending, Bonsai throws an error so you can fix the misplaced modifier immediately.
+> **Tip:** Decorators always apply to the **next** node you declare—this can be an action or a composite such as `sequence()` or `selector()`. If you try to call `end()` or `build()` while a decorator/repeat/retry is still pending, Stateup throws an error so you can fix the misplaced modifier immediately.
 
 ```cpp
 // Inverter - flips success/failure
@@ -411,7 +411,7 @@ std::cout << "Succeeder result: " << (succ_result == Status::Success ? "SUCCESS"
 ### Practical Examples
 
 ```cpp
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Example 1: Patrol behavior - repeat successful patrol route
 auto patrol_tree = Builder()
@@ -572,7 +572,7 @@ This example demonstrates:
 For advanced cases, you can create nodes manually. Some node types like `UtilitySelector` and `WeightedRandomSelector` are only available through manual creation, not through the Builder API. This allows for sophisticated AI behavior based on utility scoring.
 
 ```cpp
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Create a utility selector manually
 auto utilitySelector = std::make_shared<UtilitySelector>();
@@ -626,21 +626,21 @@ utility_tree.tick(); // Should select sleeping
 
 ## Lesson 9: Comprehensive Examples - All Features
 
-This section contains extensive examples demonstrating every feature of the Bonsai library. These examples were moved from README.md to keep the README concise.
+This section contains extensive examples demonstrating every feature of the Stateup library. These examples were moved from README.md to keep the README concise.
 
 ### Advanced Node Types and Patterns
 
 ```cpp
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <iostream>
 #include <vector>
 #include <chrono>
 #include <thread>
 
-using namespace bonsai;
+using namespace stateup;
 
 int main() {
-    std::cout << "Comprehensive Bonsai Behavior Tree Examples" << std::endl;
+    std::cout << "Comprehensive Stateup Behavior Tree Examples" << std::endl;
     std::cout << "===========================================" << std::endl;
     
     // ========================================
@@ -1058,7 +1058,7 @@ int main() {
 
 #### Guard Conditions (Behavior Trees)
 ```cpp
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 auto tree = Builder()
     .sequence()
@@ -1078,7 +1078,7 @@ auto tree = Builder()
 
 #### Guard Conditions (State Machines)
 ```cpp
-using namespace bonsai;
+using namespace stateup;
 
 auto machine = state::Builder()
     .initial("locked")
@@ -1099,7 +1099,7 @@ auto machine = state::Builder()
 
 #### Retry Logic
 ```cpp
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 auto retry_tree = Builder()
     .retry(3) // Retry up to 3 times on failure
@@ -1119,7 +1119,7 @@ For comprehensive state machine examples, see:
 
 **State Machine Quick Reference:**
 ```cpp
-using namespace bonsai;
+using namespace stateup;
 
 auto fsm = state::Builder()
     .initial("state_name")           // Set initial state
@@ -1136,4 +1136,4 @@ auto fsm = state::Builder()
 fsm->tick();  // Execute one state machine update
 ```
 
-This completes our comprehensive tutorial covering all aspects of the Bonsai behavior tree and state machine library!
+This completes our comprehensive tutorial covering all aspects of the Stateup behavior tree and state machine library!

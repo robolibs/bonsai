@@ -1,9 +1,9 @@
 #include "doctest/doctest.h"
 
-#include "bonsai/state/builder.hpp"
+#include "stateup/state/builder.hpp"
 #include <string>
 
-using namespace bonsai;
+using namespace stateup;
 
 TEST_CASE("CompositeState: orthogonal regions tick independently") {
     // Build composite with two regions A and B

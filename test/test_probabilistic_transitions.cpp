@@ -1,10 +1,10 @@
 #include <doctest/doctest.h>
 
-#include "bonsai/state/builder.hpp"
-#include "bonsai/state/machine.hpp"
+#include "stateup/state/builder.hpp"
+#include "stateup/state/machine.hpp"
 #include <map>
 
-using namespace bonsai::state;
+using namespace stateup::state;
 
 TEST_CASE("Probabilistic transitions - basic probability") {
     // Test that weights affect transition selection proportionally

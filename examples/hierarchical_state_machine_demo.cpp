@@ -1,9 +1,9 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <chrono>
 #include <iostream>
 #include <thread>
 
-using namespace bonsai;
+using namespace stateup;
 
 /**
  * Hierarchical State Machine Example: Music Player

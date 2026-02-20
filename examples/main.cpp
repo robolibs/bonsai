@@ -1,11 +1,11 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <chrono>
 #include <cmath>
 #include <iostream>
 #include <random>
 #include <thread>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Example PID Controller for demonstration
 class PIDController {
@@ -55,7 +55,7 @@ struct RobotState {
 };
 
 int main() {
-    std::cout << "🌳 Bonsai Behavior Tree Demo\n" << std::endl;
+    std::cout << "🌳 Stateup Behavior Tree Demo\n" << std::endl;
 
     // Create our demo objects
     PIDController pid;

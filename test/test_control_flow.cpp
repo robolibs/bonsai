@@ -1,7 +1,7 @@
 #include "doctest/doctest.h"
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 TEST_CASE("ConditionalNode") {
     SUBCASE("Execute then branch when condition is true") {

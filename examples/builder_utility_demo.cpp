@@ -1,8 +1,8 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <iostream>
 #include <memory>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Comprehensive Builder Pattern Demo
 class BuilderDemo {
@@ -216,7 +216,7 @@ class BuilderDemo {
 };
 
 int main() {
-    std::cout << "🌳 Bonsai Builder Pattern Comprehensive Demo\n" << std::endl;
+    std::cout << "🌳 Stateup Builder Pattern Comprehensive Demo\n" << std::endl;
 
     BuilderDemo demo;
     demo.runBasicBuilder();

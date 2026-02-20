@@ -1,9 +1,9 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <chrono>
 #include <iostream>
 #include <thread>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Example: Smart Home Automation System
 // Demonstrates all the new control flow nodes in a realistic scenario

@@ -1,11 +1,11 @@
 #include "doctest/doctest.h"
 
-#include "bonsai/state/builder.hpp"
+#include "stateup/state/builder.hpp"
 #include <algorithm>
 #include <string>
 #include <vector>
 
-using namespace bonsai;
+using namespace stateup;
 
 TEST_CASE("CompositeState: getRegionNames returns expected names") {
     auto machine = state::Builder()

@@ -1,9 +1,9 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <chrono>
 #include <iostream>
 #include <random>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Demonstration of utility-based AI selection
 class UtilityDemo {
@@ -131,7 +131,7 @@ class UtilityDemo {
 };
 
 int main() {
-    std::cout << "🔧 Bonsai Utility System Demo\n" << std::endl;
+    std::cout << "🔧 Stateup Utility System Demo\n" << std::endl;
 
     UtilityDemo demo;
     demo.runUtilitySelector();

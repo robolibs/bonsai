@@ -1,7 +1,7 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <doctest/doctest.h>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 TEST_CASE("Builder basic functionality") {
 

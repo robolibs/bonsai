@@ -1,10 +1,10 @@
-#include <bonsai/bonsai.hpp>
+#include <stateup/stateup.hpp>
 #include <cassert>
 #include <iostream>
 #include <string>
 #include <vector>
 
-using namespace bonsai::tree;
+using namespace stateup::tree;
 
 // Test all major functionality
 class ComprehensiveTest {
@@ -158,7 +158,7 @@ class ComprehensiveTest {
     }
 
     void runAllTests() {
-        std::cout << "🚀 Running Comprehensive Bonsai Tests\n" << std::endl;
+        std::cout << "🚀 Running Comprehensive Stateup Tests\n" << std::endl;
 
         testBasicNodes();
         testBlackboard();
@@ -166,7 +166,7 @@ class ComprehensiveTest {
         testDecorators();
         testUtilityNodes();
 
-        std::cout << "\n🎉 All tests passed! Bonsai is working correctly!" << std::endl;
+        std::cout << "\n🎉 All tests passed! Stateup is working correctly!" << std::endl;
     }
 };
 
