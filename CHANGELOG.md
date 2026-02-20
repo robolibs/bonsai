@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.3] - 2026-02-20
+
+### <!-- 2 -->🚜 Refactor
+
+- Rename project to Stateup
+
 ## [0.0.2] - 2026-01-18
 
 ### <!-- 0 -->⛰️  Features
